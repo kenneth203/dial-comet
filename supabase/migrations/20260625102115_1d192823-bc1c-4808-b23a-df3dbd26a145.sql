@@ -1,0 +1,1 @@
+ALTER TABLE public.user_statuses REPLICA IDENTITY FULL;

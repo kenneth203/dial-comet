@@ -1,0 +1,1 @@
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS has_inbound_call_script BOOLEAN NOT NULL DEFAULT true;

@@ -1,0 +1,1 @@
+ALTER TABLE public.proposal_invoices ADD COLUMN IF NOT EXISTS line_items jsonb NOT NULL DEFAULT '[]'::jsonb;

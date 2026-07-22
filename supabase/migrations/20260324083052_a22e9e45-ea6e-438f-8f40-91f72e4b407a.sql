@@ -1,0 +1,2 @@
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS invoiced_at timestamp with time zone DEFAULT NULL;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS invoiced_period text DEFAULT NULL;

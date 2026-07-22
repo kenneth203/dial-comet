@@ -1,0 +1,1 @@
+INSERT INTO storage.buckets (id, name, public) VALUES ('task-attachments', 'task-attachments', false) ON CONFLICT (id) DO NOTHING;

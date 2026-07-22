@@ -1,0 +1,1 @@
+SELECT cron.schedule('cleanup-completed-tasks', '0 3 * * *', 'SELECT public.cleanup_old_completed_tasks()');

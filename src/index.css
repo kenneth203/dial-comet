@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: 210 33% 97%;          /* #f5f7fa light canvas */
+    --foreground: 222 27% 14%;          /* #1a1f36 slate ink */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 27% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 27% 14%;
+
+    /* Brand */
+    --primary: 359 56% 46%;             /* #b73235 brand red */
+    --primary-foreground: 0 0% 100%;
+    --primary-variant: 211 63% 30%;     /* #1c477a brand navy */
+    --primary-glow: 359 56% 56%;
+
+    --secondary: 210 36% 96%;
+    --secondary-foreground: 211 63% 22%;
+
+    --muted: 210 30% 94%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 211 63% 30%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 359 56% 46%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 24% 90%;              /* #e5e9f0 hairline */
+    --input: 214 24% 90%;
+    --ring: 359 56% 46%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(359 56% 46%), hsl(211 63% 30%));
+    --shadow-elevated: 0 8px 24px -12px hsl(211 63% 30% / 0.18);
+    --shadow-card: 0 1px 2px hsl(211 63% 30% / 0.04), 0 4px 16px -8px hsl(211 63% 30% / 0.08);
+    --shadow-glow: 0 0 40px hsl(359 56% 56% / 0.35);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 1rem;
+
+    /* Sidebar — navy rail with red active pill */
+    --sidebar-background: 211 63% 26%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 359 56% 46%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 211 55% 33%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 211 55% 22%;
+    --sidebar-ring: 359 56% 56%;
+  }
+
+  .dark {
+    --background: 222 28% 8%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 28% 11%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 28% 11%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 359 56% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-variant: 211 63% 42%;
+    --primary-glow: 359 56% 60%;
+
+    --secondary: 217 25% 18%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 25% 16%;
+    --muted-foreground: 215 16% 65%;
+
+    --accent: 211 63% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 359 56% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 25% 20%;
+    --input: 217 25% 20%;
+    --ring: 359 56% 60%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(359 56% 50%), hsl(211 63% 42%));
+    --shadow-elevated: 0 10px 30px -10px hsl(0 0% 0% / 0.6);
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.4), 0 4px 16px -8px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 40px hsl(359 56% 60% / 0.4);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 222 28% 10%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 359 56% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 25% 18%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 25% 18%;
+    --sidebar-ring: 359 56% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Fix for iOS Safari viewport issues */
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    height: -webkit-fill-available;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Fix for iOS Safari 100vh issue */
+    min-height: -webkit-fill-available;
+    /* Prevent rubber band scrolling on iOS */
+    overscroll-behavior: none;
+    /* Improve touch scrolling */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Fix input zoom on iOS Safari */
+  input[type="search"], 
+  input[type="text"], 
+  input[type="email"], 
+  input[type="password"], 
+  textarea, 
+  select {
+    font-size: 16px;
+  }
+  
+  /* Fix for sticky elements on mobile Safari */
+  @supports (-webkit-appearance: none) {
+    .lg\:sticky {
+      position: -webkit-sticky;
+      position: sticky;
+    }
+  }
+}
+
+@layer components {
+  .text-gradient {
+    background-image: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Noticeboard branded button */
+  .rich-text-content .nb-button,
+  .nb-button {
+    display: inline-block;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, hsl(355 70% 45%), hsl(210 64% 30%));
+    color: #fff !important;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: 8px;
+    text-decoration: none !important;
+    box-shadow: 0 4px 14px -4px hsl(355 70% 45% / 0.4);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .rich-text-content .nb-button:hover,
+  .nb-button:hover {
+    box-shadow: 0 0 24px hsl(355 70% 55% / 0.5);
+    opacity: 0.95;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep scrollability (used for horizontally swipeable tab bars) */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

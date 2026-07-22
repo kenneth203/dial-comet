@@ -1,0 +1,96 @@
+-- Drop and recreate the get_all_system_users_for_management RPC with all fields
+DROP FUNCTION IF EXISTS public.get_all_system_users_for_management();
+
+create or replace function public.get_all_system_users_for_management()
+returns table(
+  id uuid,
+  user_id uuid,
+  name text,
+  email text,
+  role text,
+  status text,
+  department text,
+  job_title text,
+  title text,
+  date_of_birth date,
+  current_address text,
+  current_post_code text,
+  permanent_address text,
+  permanent_post_code text,
+  home_phone text,
+  mobile_phone text,
+  national_insurance text,
+  gender text,
+  ethnicity text,
+  nationality text,
+  disability text,
+  disability_category text,
+  marital_status text,
+  emergency_name text,
+  emergency_relationship text,
+  emergency_address text,
+  emergency_phone text,
+  bank_name text,
+  bank_address text,
+  account_number text,
+  sort_code text,
+  start_date date,
+  annual_leave_days numeric,
+  sick_leave_days numeric,
+  personal_days numeric,
+  public_holidays numeric,
+  christmas_closure_days numeric,
+  carried_over_days numeric,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = 'public'
+as $$
+  select 
+    su.id,
+    su.user_id,
+    su.name,
+    su.email,
+    su.role,
+    su.status,
+    su.department,
+    su.job_title,
+    su.title,
+    su.date_of_birth,
+    su.current_address,
+    su.current_post_code,
+    su.permanent_address,
+    su.permanent_post_code,
+    su.home_phone,
+    su.mobile_phone,
+    su.national_insurance,
+    su.gender,
+    su.ethnicity,
+    su.nationality,
+    su.disability,
+    su.disability_category,
+    su.marital_status,
+    su.emergency_name,
+    su.emergency_relationship,
+    su.emergency_address,
+    su.emergency_phone,
+    su.bank_name,
+    su.bank_address,
+    su.account_number,
+    su.sort_code,
+    su.start_date,
+    su.annual_leave_days,
+    su.sick_leave_days,
+    su.personal_days,
+    su.public_holidays,
+    su.christmas_closure_days,
+    su.carried_over_days,
+    su.created_at,
+    su.updated_at
+  from public.system_users su
+  where is_admin_or_higher()
+  order by su.name;
+$$;

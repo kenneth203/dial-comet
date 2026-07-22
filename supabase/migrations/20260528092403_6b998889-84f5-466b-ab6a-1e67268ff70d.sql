@@ -1,0 +1,1 @@
+ALTER TABLE public.proposal_tokens ADD COLUMN IF NOT EXISTS customer_snapshot JSONB DEFAULT '{}'::jsonb;

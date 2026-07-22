@@ -1,0 +1,2 @@
+ALTER TABLE public.email_intake_rules DROP CONSTRAINT email_intake_rules_match_type_check;
+ALTER TABLE public.email_intake_rules ADD CONSTRAINT email_intake_rules_match_type_check CHECK (match_type = ANY (ARRAY['email'::text, 'name_contains'::text, 'domain'::text, 'subject_contains'::text, 'body_contains'::text]));

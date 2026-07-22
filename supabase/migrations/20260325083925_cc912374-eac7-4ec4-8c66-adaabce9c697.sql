@@ -1,0 +1,2 @@
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS lead_metadata jsonb DEFAULT NULL;
+COMMENT ON COLUMN public.customers.lead_metadata IS 'CRM lead metadata: { source, pipelineStatus, value, lastContact, notes }. Only populated for customers with status=Lead.';

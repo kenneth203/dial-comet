@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS form_sub_insert_anon_validated ON public.form_submissions;

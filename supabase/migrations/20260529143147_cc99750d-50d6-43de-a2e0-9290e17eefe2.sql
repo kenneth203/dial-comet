@@ -1,0 +1,5 @@
+
+DROP FUNCTION IF EXISTS public.add_customer_secure(text, text, text, text, text, text, jsonb);
+DROP FUNCTION IF EXISTS public.add_customer_secure(text, text, text, text, text, text, text, text, text, text, text, text, text, text, date, text, jsonb, jsonb, text, jsonb, text, text, jsonb, jsonb, jsonb, text, text, text, text, text, text, text, text, jsonb, text, numeric, numeric, text, numeric, integer, numeric, text, numeric, numeric, integer, text, numeric, text, numeric, integer, numeric, jsonb);
+DROP FUNCTION IF EXISTS public.update_customer_secure(uuid, text, text, text, text, text, text, jsonb);
+DROP FUNCTION IF EXISTS public.update_customer_secure(uuid, text, text, text, text, text, text, text, text, text, text, text, text, text, text, date, text, jsonb, jsonb, text, jsonb, text, text, jsonb, jsonb, jsonb, text, text, text, text, text, text, text, text, jsonb, text, numeric, numeric, text, numeric, integer, numeric, text, numeric, numeric, integer, text, numeric, text, numeric, integer, numeric, jsonb);

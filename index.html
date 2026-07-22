@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-touch-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-touch-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="icon" type="desktop-touch-icon-portal/png" href="favicon.png">
+    
+    <!-- Critical CSS - Inline essential styles to prevent render blocking -->
+    <style>
+      /* Critical CSS Variables - Essential for layout and theming */
+      :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --primary: 355 70% 45%;
+        --primary-foreground: 0 0% 100%;
+        --border: 214.3 31.8% 91.4%;
+        --ring: 222.2 84% 4.9%;
+        --radius: 0.5rem;
+      }
+      
+      /* Critical base styles */
+      *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: theme('borderColor.DEFAULT', currentColor); }
+      html { line-height: 1.5; -webkit-text-size-adjust: 100%; tab-size: 4; }
+      body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+      #root { min-height: 100vh; }
+      
+      /* Loading state for better UX */
+      .critical-loading { 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+      }
+    </style>
+    
+    <!-- Cache-friendly resource hints for better client-side caching -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://maps.googleapis.com">
+    <link rel="dns-prefetch" href="https://wszjasdcxoznryykhwll.supabase.co">
+    
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;">
+    <link rel="icon" href="/favicon.png?v=2" type="image/png" sizes="any">
+    <link rel="shortcut icon" href="/favicon.png?v=2" type="image/png">
+    
+    <title>The VA Team Portal</title>
+    <meta name="description" content="The VA Team Portal - Telephone Answering Management System" />
+    <meta name="author" content="The VA Team" />
+
+    <meta property="og:title" content="The VA Team Portal" />
+    <meta property="og:description" content="The VA Team Portal - Telephone Answering Management System" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://portal.thevateam.co.uk/va-team-logo.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://portal.thevateam.co.uk/va-team-logo.png" />
+  </head>
+
+  <body>
+    <div id="root">
+      <!-- Fallback content with critical styles for better perceived performance -->
+      <div class="critical-loading">
+        <div style="
+          width: 32px; 
+          height: 32px; 
+          border: 3px solid hsl(var(--border)); 
+          border-top: 3px solid hsl(var(--primary)); 
+          border-radius: 50%; 
+          animation: spin 1s linear infinite;
+        "></div>
+      </div>
+    </div>
+    <style>
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+    <script type="module" src="/src/main.tsx" fetchpriority="high"></script>
+  </body>
+</html>

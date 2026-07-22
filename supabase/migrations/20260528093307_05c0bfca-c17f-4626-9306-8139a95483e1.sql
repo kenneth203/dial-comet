@@ -1,0 +1,1 @@
+ALTER TABLE public.proposal_tokens ADD COLUMN IF NOT EXISTS service_type TEXT;

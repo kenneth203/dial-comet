@@ -1,0 +1,1 @@
+DELETE FROM public.task_notifications WHERE type = 'holiday_approval' AND message LIKE 'TEST %';
