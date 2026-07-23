@@ -2993,6 +2993,72 @@ export type Database = {
           },
         ]
       }
+      permission_grant_audit: {
+        Row: {
+          actor_name_snapshot: string | null
+          actor_role_snapshot: string | null
+          actor_status_snapshot: string | null
+          actor_user_id: string | null
+          created_at: string
+          feature_snapshot: string | null
+          id: string
+          new_granted: boolean | null
+          new_scope: string | null
+          outcome: string
+          outcome_code: string
+          outcome_message: string | null
+          permission_id: string | null
+          previous_granted: boolean | null
+          previous_scope: string | null
+          requested_granted: boolean | null
+          requested_scope: string | null
+          section_snapshot: string | null
+          target_role: string | null
+        }
+        Insert: {
+          actor_name_snapshot?: string | null
+          actor_role_snapshot?: string | null
+          actor_status_snapshot?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          feature_snapshot?: string | null
+          id?: string
+          new_granted?: boolean | null
+          new_scope?: string | null
+          outcome: string
+          outcome_code: string
+          outcome_message?: string | null
+          permission_id?: string | null
+          previous_granted?: boolean | null
+          previous_scope?: string | null
+          requested_granted?: boolean | null
+          requested_scope?: string | null
+          section_snapshot?: string | null
+          target_role?: string | null
+        }
+        Update: {
+          actor_name_snapshot?: string | null
+          actor_role_snapshot?: string | null
+          actor_status_snapshot?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          feature_snapshot?: string | null
+          id?: string
+          new_granted?: boolean | null
+          new_scope?: string | null
+          outcome?: string
+          outcome_code?: string
+          outcome_message?: string | null
+          permission_id?: string | null
+          previous_granted?: boolean | null
+          previous_scope?: string | null
+          requested_granted?: boolean | null
+          requested_scope?: string | null
+          section_snapshot?: string | null
+          target_role?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -4997,6 +5063,10 @@ export type Database = {
       is_admin_or_higher: { Args: never; Returns: boolean }
       is_admin_strictly: { Args: never; Returns: boolean }
       is_chat_room_member: { Args: { p_room_id: string }; Returns: boolean }
+      is_locked_admin_permission: {
+        Args: { p_feature: string; p_section: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: never; Returns: boolean }
       log_sensitive_data_access: {
         Args: { action: string; employee_id: string }
@@ -5170,7 +5240,16 @@ export type Database = {
           p_role: string
           p_scope: string
         }
-        Returns: undefined
+        Returns: {
+          audit_id: string
+          new_granted: boolean
+          new_scope: string
+          outcome: string
+          outcome_code: string
+          outcome_message: string
+          previous_granted: boolean
+          previous_scope: string
+        }[]
       }
       update_todo_note_body: {
         Args: { p_body: string; p_note_created_at: string; p_task_id: string }
