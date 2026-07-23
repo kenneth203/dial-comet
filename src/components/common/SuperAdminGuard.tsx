@@ -29,11 +29,12 @@ export default function SuperAdminGuard({ children, redirectTo = "/" }: SuperAdm
     }
     (async () => {
       try {
-        const { data, error } = await withTimeout(
-          Promise.resolve(supabase.rpc("is_super_admin")),
+        const result = await withTimeout<{ data: unknown; error: unknown }>(
+          supabase.rpc("is_super_admin") as unknown as Promise<{ data: unknown; error: unknown }>,
           SUPER_ADMIN_CHECK_TIMEOUT_MS,
           "rpc:is_super_admin",
         );
+        const { data, error } = result;
         if (cancelled) return;
         setAllowed(!error && data === true);
       } catch {
