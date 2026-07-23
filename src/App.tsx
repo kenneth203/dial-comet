@@ -161,8 +161,11 @@ const App = () => {
           </CustomersProvider>
         </UsersProvider>
       </AuthProvider>
+      </div>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
+
 
 export default App;
