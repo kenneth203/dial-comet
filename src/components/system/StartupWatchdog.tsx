@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { clearProjectAuthStorage } from '@/lib/boot-storage-guard';
+import { appReload } from '@/lib/appReload';
 
 const WATCHDOG_MS = 12_000;
 
@@ -36,10 +37,10 @@ export function StartupWatchdog() {
       clearProjectAuthStorage();
       window.sessionStorage.removeItem('app:chunk-reload-attempted');
     } catch { /* ignore */ }
-    window.location.replace('/auth');
+    appReload({ reason: 'watchdog-recover', source: 'StartupWatchdog', navigateTo: '/auth' });
   };
 
-  const reload = () => window.location.reload();
+  const reload = () => appReload({ reason: 'watchdog-reload', source: 'StartupWatchdog' });
 
   return (
     <div style={overlay}>

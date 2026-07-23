@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { clearProjectAuthStorage } from '@/lib/boot-storage-guard';
+import { appReload } from '@/lib/appReload';
 
 interface Props {
   children: ReactNode;
@@ -39,7 +40,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       const alreadyTried = window.sessionStorage.getItem(RELOAD_GUARD_KEY) === '1';
       if (!alreadyTried) {
         try { window.sessionStorage.setItem(RELOAD_GUARD_KEY, '1'); } catch { /* ignore */ }
-        window.location.reload();
+        appReload({ reason: 'chunk-load-error', source: 'AppErrorBoundary' });
       }
     }
   }
@@ -49,12 +50,12 @@ export class AppErrorBoundary extends Component<Props, State> {
       clearProjectAuthStorage();
       window.sessionStorage.removeItem(RELOAD_GUARD_KEY);
     } catch { /* ignore */ }
-    window.location.replace('/auth');
+    appReload({ reason: 'error-boundary-recover', source: 'AppErrorBoundary', navigateTo: '/auth' });
   };
 
   private handleReload = () => {
     try { window.sessionStorage.removeItem(RELOAD_GUARD_KEY); } catch { /* ignore */ }
-    window.location.reload();
+    appReload({ reason: 'error-boundary-reload', source: 'AppErrorBoundary' });
   };
 
   render() {
