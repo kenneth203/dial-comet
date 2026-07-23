@@ -4236,6 +4236,161 @@ export type Database = {
         }
         Relationships: []
       }
+      user_suspension_audit: {
+        Row: {
+          action: string
+          actor_name_snapshot: string | null
+          actor_role_snapshot: string | null
+          actor_status_snapshot: string | null
+          actor_user_id: string | null
+          created_at: string
+          details: Json
+          from_state: Database["public"]["Enums"]["suspension_state"] | null
+          id: string
+          reservation_id: string | null
+          to_state: Database["public"]["Enums"]["suspension_state"] | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor_name_snapshot?: string | null
+          actor_role_snapshot?: string | null
+          actor_status_snapshot?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          details?: Json
+          from_state?: Database["public"]["Enums"]["suspension_state"] | null
+          id?: string
+          reservation_id?: string | null
+          to_state?: Database["public"]["Enums"]["suspension_state"] | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor_name_snapshot?: string | null
+          actor_role_snapshot?: string | null
+          actor_status_snapshot?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          details?: Json
+          from_state?: Database["public"]["Enums"]["suspension_state"] | null
+          id?: string
+          reservation_id?: string | null
+          to_state?: Database["public"]["Enums"]["suspension_state"] | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_suspension_reservation: {
+        Row: {
+          actor_name_snapshot: string | null
+          actor_role_snapshot: string
+          actor_status_snapshot: string
+          actor_user_id: string
+          attempt_count: number
+          completed_at: string | null
+          created_at: string
+          executing_at: string | null
+          failure_reason: string | null
+          id: string
+          lease_expires_at: string
+          operation: Database["public"]["Enums"]["suspension_operation"]
+          reason: string | null
+          status: Database["public"]["Enums"]["suspension_reservation_status"]
+          target_role_snapshot: string | null
+          target_state_before: Database["public"]["Enums"]["suspension_state"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actor_name_snapshot?: string | null
+          actor_role_snapshot: string
+          actor_status_snapshot: string
+          actor_user_id: string
+          attempt_count?: number
+          completed_at?: string | null
+          created_at?: string
+          executing_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          lease_expires_at: string
+          operation: Database["public"]["Enums"]["suspension_operation"]
+          reason?: string | null
+          status?: Database["public"]["Enums"]["suspension_reservation_status"]
+          target_role_snapshot?: string | null
+          target_state_before: Database["public"]["Enums"]["suspension_state"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actor_name_snapshot?: string | null
+          actor_role_snapshot?: string
+          actor_status_snapshot?: string
+          actor_user_id?: string
+          attempt_count?: number
+          completed_at?: string | null
+          created_at?: string
+          executing_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          lease_expires_at?: string
+          operation?: Database["public"]["Enums"]["suspension_operation"]
+          reason?: string | null
+          status?: Database["public"]["Enums"]["suspension_reservation_status"]
+          target_role_snapshot?: string | null
+          target_state_before?: Database["public"]["Enums"]["suspension_state"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_suspension_state: {
+        Row: {
+          active_reservation_id: string | null
+          actor_user_id: string | null
+          created_at: string
+          last_reconciled_at: string | null
+          reason: string | null
+          state: Database["public"]["Enums"]["suspension_state"]
+          state_entered_at: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          active_reservation_id?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          last_reconciled_at?: string | null
+          reason?: string | null
+          state?: Database["public"]["Enums"]["suspension_state"]
+          state_entered_at?: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          active_reservation_id?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          last_reconciled_at?: string | null
+          reason?: string | null
+          state?: Database["public"]["Enums"]["suspension_state"]
+          state_entered_at?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_suspension_state_active_reservation_id_fkey"
+            columns: ["active_reservation_id"]
+            isOneToOne: false
+            referencedRelation: "user_suspension_reservation"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       xero_connection: {
         Row: {
           access_token: string
@@ -4456,6 +4611,18 @@ export type Database = {
         Args: { p_id: string; p_notes?: string }
         Returns: undefined
       }
+      complete_reservation: {
+        Args: {
+          p_failure_reason?: string
+          p_reservation_id: string
+          p_success: boolean
+        }
+        Returns: {
+          message: string
+          outcome: string
+        }[]
+      }
+      count_effective_active_super_admins: { Args: never; Returns: number }
       create_direct_message_room: {
         Args: { target_user_id: string }
         Returns: string
@@ -4519,6 +4686,12 @@ export type Database = {
       }
       ensure_required_team_chat_memberships: { Args: never; Returns: undefined }
       ensure_required_team_chat_rooms: { Args: never; Returns: undefined }
+      expire_stale_reservations: {
+        Args: { p_batch_size?: number }
+        Returns: {
+          expired_count: number
+        }[]
+      }
       find_customer_duplicates: {
         Args: {
           p_address: string
@@ -4533,6 +4706,13 @@ export type Database = {
           name: string
           reasons: string[]
           score: number
+        }[]
+      }
+      flag_suspension_incident: {
+        Args: { p_reason: string; p_user_id: string }
+        Returns: {
+          message: string
+          outcome: string
         }[]
       }
       generate_billing_for_period: {
@@ -5073,6 +5253,13 @@ export type Database = {
         Returns: undefined
       }
       mark_overdue_checklist: { Args: never; Returns: number }
+      mark_reservation_executing: {
+        Args: { p_reservation_id: string }
+        Returns: {
+          message: string
+          outcome: string
+        }[]
+      }
       mark_self_offline: { Args: never; Returns: undefined }
       mark_stale_users_offline: { Args: never; Returns: number }
       move_to_dlq: {
@@ -5106,10 +5293,34 @@ export type Database = {
         }[]
       }
       record_failed_login: { Args: { p_email: string }; Returns: undefined }
+      recover_suspension_incident: {
+        Args: {
+          p_reason?: string
+          p_target_state: Database["public"]["Enums"]["suspension_state"]
+          p_user_id: string
+        }
+        Returns: {
+          message: string
+          outcome: string
+        }[]
+      }
       regenerate_all_user_checklists_today: { Args: never; Returns: number }
       rename_channel: {
         Args: { p_name: string; p_room_id: string }
         Returns: undefined
+      }
+      reserve_user_suspension: {
+        Args: {
+          p_lease_seconds?: number
+          p_operation: Database["public"]["Enums"]["suspension_operation"]
+          p_reason: string
+          p_target_user_id: string
+        }
+        Returns: {
+          message: string
+          outcome: string
+          reservation_id: string
+        }[]
       }
       resolve_auth_user_id: { Args: { p_id: string }; Returns: string }
       save_checklist_instance_note: {
@@ -5320,6 +5531,19 @@ export type Database = {
       request_status: "pending" | "approved" | "declined" | "cancelled"
       shift_status: "draft" | "active" | "cancelled" | "completed"
       skill_level: "required" | "preferred" | "nice_to_have"
+      suspension_operation: "suspend" | "unsuspend"
+      suspension_reservation_status:
+        | "pending"
+        | "executing"
+        | "completed"
+        | "failed"
+        | "expired"
+      suspension_state:
+        | "active"
+        | "suspend_pending"
+        | "suspended"
+        | "unsuspend_pending"
+        | "incident"
       user_role: "Operator" | "Supervisor" | "Admin" | "Super-Admin" | "HR"
     }
     CompositeTypes: {
@@ -5499,6 +5723,21 @@ export const Constants = {
       request_status: ["pending", "approved", "declined", "cancelled"],
       shift_status: ["draft", "active", "cancelled", "completed"],
       skill_level: ["required", "preferred", "nice_to_have"],
+      suspension_operation: ["suspend", "unsuspend"],
+      suspension_reservation_status: [
+        "pending",
+        "executing",
+        "completed",
+        "failed",
+        "expired",
+      ],
+      suspension_state: [
+        "active",
+        "suspend_pending",
+        "suspended",
+        "unsuspend_pending",
+        "incident",
+      ],
       user_role: ["Operator", "Supervisor", "Admin", "Super-Admin", "HR"],
     },
   },
