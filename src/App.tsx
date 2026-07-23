@@ -58,6 +58,7 @@ import { UserManagementProvider } from "@/context/UserManagementContext";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { PermissionGuard } from "@/components/common/PermissionGuard";
 import { DevEnvironmentBanner, DevEnvironmentBlockScreen } from "@/components/system/DevEnvironmentBanner";
+import { StartupWatchdog } from "@/components/system/StartupWatchdog";
 import { useIsDevEnvironment } from "@/lib/dev-environment";
 
 
