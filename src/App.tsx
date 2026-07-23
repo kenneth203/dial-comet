@@ -87,9 +87,11 @@ const App = () => {
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <DevEnvironmentBanner />
+      <StartupWatchdog />
       <div style={{ paddingTop: 28 }}>
       <Toaster />
       <Sonner />
+
 
       <AuthProvider>
         <UsersProvider>
