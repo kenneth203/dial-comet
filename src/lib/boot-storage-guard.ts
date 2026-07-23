@@ -37,41 +37,35 @@ function isValidSession(raw: string): boolean {
   }
 }
 
-export function runBootStorageGuard(): { cleared: string[] } {
+export function runBootStorageGuard(): { cleared: string[]; skipped: boolean } {
   const cleared: string[] = [];
   if (typeof window === 'undefined' || !('localStorage' in window)) {
-    return { cleared };
+    return { cleared, skipped: true };
   }
 
   const targetKey = projectAuthStorageKey();
 
-  try {
-    if (targetKey) {
-      const raw = window.localStorage.getItem(targetKey);
-      if (raw !== null && !isValidSession(raw)) {
-        window.localStorage.removeItem(targetKey);
-        cleared.push(targetKey);
-      }
-      return { cleared };
-    }
+  // If the exact project-scoped key cannot be derived (missing / invalid
+  // VITE_SUPABASE_URL) we DO NOT delete anything. The main.tsx config screen
+  // will render instead, and the user can clear the scoped session manually
+  // once configuration is restored.
+  if (!targetKey) {
+    return { cleared, skipped: true };
+  }
 
-    // No project ref available — fall back to scanning sb-*-auth-token keys.
-    for (let i = window.localStorage.length - 1; i >= 0; i--) {
-      const key = window.localStorage.key(i);
-      if (!key) continue;
-      if (!key.startsWith(AUTH_KEY_PREFIX) || !key.endsWith(AUTH_KEY_SUFFIX)) continue;
-      const raw = window.localStorage.getItem(key);
-      if (raw !== null && !isValidSession(raw)) {
-        window.localStorage.removeItem(key);
-        cleared.push(key);
-      }
+  try {
+    const raw = window.localStorage.getItem(targetKey);
+    if (raw !== null && !isValidSession(raw)) {
+      window.localStorage.removeItem(targetKey);
+      cleared.push(targetKey);
     }
   } catch {
     // localStorage may throw in private modes — best-effort only.
   }
 
-  return { cleared };
+  return { cleared, skipped: false };
 }
+
 
 export function clearProjectAuthStorage(): void {
   if (typeof window === 'undefined' || !('localStorage' in window)) return;
