@@ -30,7 +30,7 @@ export default function SuperAdminGuard({ children, redirectTo = "/" }: SuperAdm
     (async () => {
       try {
         const { data, error } = await withTimeout(
-          supabase.rpc("is_super_admin"),
+          Promise.resolve(supabase.rpc("is_super_admin")),
           SUPER_ADMIN_CHECK_TIMEOUT_MS,
           "rpc:is_super_admin",
         );
