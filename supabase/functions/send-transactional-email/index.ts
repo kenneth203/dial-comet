@@ -2,6 +2,9 @@ import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
+import { assertDevEnvironment } from '../_shared/env-guard.ts'
+import { assertEmailAllowed, decorateDevSubject, devFooterHtml } from '../_shared/email-guard.ts'
+
 
 // Configuration baked in at scaffold time — do NOT change these manually.
 // To update, re-run the email domain setup flow.
@@ -31,10 +34,15 @@ function generateToken(): string {
 }
 
 Deno.serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
+  // Phase 0.5 environment gate
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -149,17 +157,10 @@ Deno.serve(async (req) => {
   // Templates that should always BCC Kenneth so he has a record of every outbound copy.
   // We send a separate "[Copy]" email rather than a true SMTP BCC so it shows up cleanly
   // in his inbox AND in the email_send_log for audit purposes.
-  const ALWAYS_BCC_KENNETH: string[] = [
-    'customer-form-link',
-    'proposal-link',
-    'proposal-invoice',
-  ]
-  if (templateName && ALWAYS_BCC_KENNETH.includes(templateName)) {
-    const kenneth = 'kenneth@thevateam.co.uk'
-    if (!bccEmails.map((e) => e.toLowerCase()).includes(kenneth)) {
-      bccEmails.push(kenneth)
-    }
-  }
+  // Phase 0.5: hard-coded Kenneth BCC removed. Notification copies must be
+  // controlled through DEV_EMAIL_ALLOWLIST / DEV_NOTIFICATIONS_TO and pass
+  // the email guard below.
+
 
   if (!templateName) {
     return new Response(
