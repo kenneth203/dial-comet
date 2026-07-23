@@ -2,6 +2,9 @@ import { ReactNode, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { withTimeout } from "@/lib/withTimeout";
+
+const SUPER_ADMIN_CHECK_TIMEOUT_MS = 8_000;
 
 interface SuperAdminGuardProps {
   children: ReactNode;
