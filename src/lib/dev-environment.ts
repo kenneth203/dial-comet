@@ -1,10 +1,26 @@
 // Phase 0.5 Development Safety Hardening — client-side environment gate.
-// This Remix is permanently classified as `development`. The only accepted
-// value for VITE_APP_ENV is the exact literal string "development".
-// Any other value triggers a full-screen block screen instead of the app.
+// This Remix is permanently classified as `development`. If VITE_APP_ENV is
+// present, the only accepted value is the exact literal string "development".
+// Lovable static previews can omit ignored .env files, so the checked-in code
+// defaults the client classification to development, then also restricts the
+// app to the confirmed Remix preview origin or localhost.
 
 export const DEV_ENV_VALUE = 'development';
+const REMIX_PREVIEW_ORIGIN = 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app';
+
+function isAllowedDevOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const { hostname, origin } = window.location;
+  return (
+    origin === REMIX_PREVIEW_ORIGIN ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1'
+  );
+}
 
 export function useIsDevEnvironment(): boolean {
-  return import.meta.env.VITE_APP_ENV === DEV_ENV_VALUE;
+  const configuredEnv = import.meta.env.VITE_APP_ENV ?? DEV_ENV_VALUE;
+  return configuredEnv === DEV_ENV_VALUE && isAllowedDevOrigin();
 }
