@@ -7,6 +7,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 // Note: inbound-email is invoked over HTTP (cross-function imports don't bundle).
 
+import { assertDevEnvironment, disabledInDevResponse } from '../_shared/env-guard.ts';
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/google_mail/gmail/v1'
 const DEFAULT_QUERY = 'to:dictations@thevateam.london is:unread newer_than:7d'
 const MAX_PER_RUN = 15
@@ -233,6 +234,9 @@ async function requireAdmin(req: Request, supabaseUrl: string): Promise<Response
 }
 
 Deno.serve(async (req) => {
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+  return disabledInDevResponse('poll-gmail-dictations');
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')

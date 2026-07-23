@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4'
 
+import { assertDevEnvironment, disabledInDevResponse } from '../_shared/env-guard.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -38,6 +39,9 @@ const REMINDER_MAP: Record<ReminderKey, { type: string; offsetDays: number; subj
 }
 
 Deno.serve(async (req) => {
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+  return disabledInDevResponse('process-invoice-reminders');
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   // Only the scheduler can trigger this. We verify the bearer token by
