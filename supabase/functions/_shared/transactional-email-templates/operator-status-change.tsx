@@ -8,7 +8,7 @@ import type { TemplateEntry } from './registry.ts'
 import { EmailSignature } from './_signature.tsx'
 
 const SITE_NAME = 'The VA Team'
-const PORTAL_URL = 'https://portal.thevateam.co.uk'
+const PORTAL_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app'
 
 interface OperatorStatusChangeProps {
   operatorName?: string
@@ -76,7 +76,7 @@ export const template = {
     const went = d.transition === 'online_to_offline' ? 'OFFLINE' : 'ONLINE'
     return `[Presence] ${d.operatorName || 'Operator'} is now ${went}`
   },
-  to: 'kenneth@thevateam.co.uk',
+  to: 'dev-test-recipient@example.invalid',
   displayName: 'Operator status change (internal)',
   previewData: {
     operatorName: 'Jane Smith',

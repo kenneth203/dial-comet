@@ -8,7 +8,7 @@ import type { TemplateEntry } from './registry.ts'
 import { EmailSignature } from './_signature.tsx'
 
 const SITE_NAME = 'The VA Team'
-const PORTAL_URL = 'https://portal.thevateam.co.uk'
+const PORTAL_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app'
 
 interface CustomerFormLinkProps {
   clientName?: string
@@ -80,7 +80,7 @@ export const template = {
   previewData: {
     clientName: 'Jane Smith',
     formName: 'VR Client Onboarding Questionnaire',
-    formUrl: 'https://portal.thevateam.co.uk/form/00000000-0000-0000-0000-000000000000',
+    formUrl: 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app/form/00000000-0000-0000-0000-000000000000',
   },
 } satisfies TemplateEntry
 
