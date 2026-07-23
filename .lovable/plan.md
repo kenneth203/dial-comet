@@ -1,27 +1,30 @@
-## Fix: Move shared inbound-email logic to `_shared`
+## Symptom
+On `/auth` (and `/`) in the Lovable preview iframe you see only a spinner on a white background — this is the inline `.critical-loading` div in `index.html`. React never boots, so `main.tsx` never clears it, so the spinner stays forever. In a fresh headless browser hitting the sandbox dev server directly, the sign-in form renders fine and there are no console/network errors.
 
-### Problem
-`supabase/functions/retry-inbound-emails/index.ts` imports `processInboundEmail` from `../inbound-email/index.ts`. Each Edge Function deploys as an isolated bundle containing only its own directory plus `_shared`, so cross-function imports break Remix/deploy.
+## Root cause
+`index.html` ships a hard-coded `<meta http-equiv="Content-Security-Policy">` tuned for the *production* domain. In the Lovable preview iframe it blocks the extra scripts/frames/websockets Lovable injects around the app (lovable-tagger runtime, preview messaging, HMR socket on `*.lovable.app`), which prevents the React bundle from executing to completion — so the fallback spinner is all you ever see.
 
-### Changes
+`index.html` also contains a `dns-prefetch` pointing at the old production Supabase project ref and an absolute `og:image` on `portal.thevateam.co.uk` — stale from the remix source, unrelated to the load failure but worth clearing at the same time.
 
-1. **Create `supabase/functions/_shared/inbound-email.ts`**
-   - Move `processInboundEmail` and its helpers (`stripHtml`, `base64ToBytes`, `sanitizeFilename`, `InboundPayload`/`InboundAttachment` types, `MAX_ATTACHMENT_BYTES`, `BUCKET`) verbatim from `inbound-email/index.ts`.
-   - Keep the `npm:@supabase/supabase-js@2` import for the `createClient` type.
-   - Export `processInboundEmail` and the `InboundPayload` type.
+Scope reminder: this is purely a frontend / `index.html` change. No migrations, RLS, permissions, edge functions, or Cloud config are touched. Nothing gets published.
 
-2. **Update `supabase/functions/inbound-email/index.ts`**
-   - Remove the moved helpers and `processInboundEmail` definition.
-   - Import them from `../_shared/inbound-email.ts`.
-   - Deno.serve handler and all behavior unchanged.
+## Plan
 
-3. **Update `supabase/functions/retry-inbound-emails/index.ts`**
-   - Change `import { processInboundEmail } from '../inbound-email/index.ts'` to `from '../_shared/inbound-email.ts'`.
-   - No other changes.
+1. **Loosen the CSP in `index.html` so the preview iframe can render.**
+   - Remove the `<meta http-equiv="Content-Security-Policy">` tag from `index.html`. The production site should set CSP at the hosting/edge layer (response header), not inline in the HTML shipped to every environment — the meta form has no way to vary between "prod domain", "Lovable preview iframe", and "sandbox dev", which is what caused this.
+   - If you'd rather keep a meta CSP for defense in depth, the alternative is to widen it to also allow `https://cdn.gpteng.co` in `script-src`, `https://*.lovable.app https://*.lovable.dev` in `frame-src`/`frame-ancestors`, and `wss://*.lovable.app` in `connect-src`. Removal is simpler and matches what most Lovable projects ship.
 
-### Behavior preservation
-- No logic changes: same rule matching, customer lookup, round-robin assignee, attachment upload, notification insert, and log status transitions.
-- Same exports/signatures; both functions call `processInboundEmail(supabase, payload, logId)` identically.
+2. **Clean up stale prod references in the `<head>`.**
+   - Remove the `<link rel="dns-prefetch" href="https://wszjasdcxoznryykhwll.supabase.co">` line (old production project ref; the current Cloud URL is already read from `import.meta.env`).
+   - Replace the absolute `og:image` / `twitter:image` (`https://portal.thevateam.co.uk/va-team-logo.png`) with either the same asset served from `/` on the current origin, or drop the tag — Lovable hosting will inject a preview image at publish time.
 
-### Verification
-- Confirm both functions typecheck and deploy independently (no cross-function relative imports remain).
+3. **Verify.**
+   - After the edits, flush the HMR gate and reload the preview iframe.
+   - Confirm `/auth` renders the sign-in form (no more perpetual spinner) and `/` redirects to `/auth` because there's no session.
+   - Check the browser Console for zero CSP violation errors.
+
+## Technical details
+
+- Files touched: `index.html` only.
+- No changes to `src/`, no changes to Supabase / Cloud, no changes to `supabase/` migrations, no publish.
+- If step 1 turns out not to be sufficient (e.g. the spinner persists after removing the meta CSP), the next diagnostic step is to open DevTools in the preview iframe, capture the actual Console error, and iterate — but the CSP is the highest-probability cause given (a) the sandbox renders fine, (b) the only thing between "React boots" and "spinner forever" is a script-load failure, and (c) the CSP is the only known thing in `index.html` that behaves differently between the local sandbox and the Lovable preview wrapping.
