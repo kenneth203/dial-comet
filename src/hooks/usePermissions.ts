@@ -156,6 +156,7 @@ export function usePermissions() {
     isMenuVisible,
     canAccessPage,
     isLoading,
+    isError,
     userRole,
     isSuperAdmin,
     isSupervisor,
