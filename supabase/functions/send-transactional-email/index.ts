@@ -395,21 +395,41 @@ Deno.serve(async (req) => {
   )
 
   // Resolve subject — supports static string or dynamic function
-  const resolvedSubject =
+  const rawSubject =
     typeof template.subject === 'function'
       ? template.subject(templateData)
       : template.subject
+  const resolvedSubject = decorateDevSubject(rawSubject)
+  const devHtml = html + devFooterHtml()
+
+  // Phase 0.5 email guard — checks to/cc/bcc/reply_to against DEV_EMAIL_ALLOWLIST
+  const guardResult = assertEmailAllowed({
+    to: effectiveRecipient,
+    bcc: bccEmails,
+    reply_to: replyTo,
+  })
+  if (!guardResult.allowed) {
+    await supabase.from('email_send_log').insert({
+      message_id: messageId,
+      template_name: templateName,
+      recipient_email: effectiveRecipient,
+      status: 'blocked_dev',
+    })
+    console.warn('[email-guard] blocked send', guardResult)
+    return new Response(
+      JSON.stringify({ success: false, reason: guardResult.reason, blocked: guardResult.blocked }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
 
   // 5. Enqueue the pre-rendered email for async processing by the dispatcher.
-  // The dispatcher (process-email-queue) handles sending, retries, and rate-limit backoff.
-
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
   await supabase.from('email_send_log').insert({
     message_id: messageId,
     template_name: templateName,
     recipient_email: effectiveRecipient,
     status: 'pending',
   })
+
 
   const { error: enqueueError } = await supabase.rpc('enqueue_email', {
     queue_name: 'transactional_emails',
