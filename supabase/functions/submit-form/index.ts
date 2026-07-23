@@ -90,8 +90,8 @@ Deno.serve(async (req) => {
             formName,
             submittedAt,
             reviewUrl: submission.customer_id
-              ? `https://portal.thevateam.co.uk/customers?customerId=${submission.customer_id}`
-              : "https://portal.thevateam.co.uk/customers",
+              ? `https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app/customers?customerId=${submission.customer_id}`
+              : "https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app/customers",
           },
         },
       });
