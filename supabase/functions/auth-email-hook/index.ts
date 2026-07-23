@@ -35,11 +35,16 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
   reauthentication: ReauthenticationEmail,
 }
 
+// Phase 0.5: dev-only guards
+import { assertDevEnvironment } from '../_shared/env-guard.ts'
+import { assertEmailAllowed, decorateDevSubject, devFooterHtml } from '../_shared/email-guard.ts'
+
 // Configuration
-const SITE_NAME = "The VA Team"
+const SITE_NAME = "Operations Workspace (DEV)"
 const SENDER_DOMAIN = "notify.portal.thevateam.co.uk"
 const ROOT_DOMAIN = "portal.thevateam.co.uk"
 const FROM_DOMAIN = "notify.portal.thevateam.co.uk" // Domain shown in From address (may be root or sender subdomain)
+
 
 // Sample data for preview mode ONLY (not used in actual email sending).
 // URLs are baked in at scaffold time from the project's real data.
@@ -250,6 +255,21 @@ async function handleWebhook(req: Request): Promise<Response> {
     status: 'pending',
   })
 
+  // Phase 0.5 email guard — block if recipient not in DEV_EMAIL_ALLOWLIST
+  const guard = assertEmailAllowed({ to: payload.data.email })
+  if (!guard.allowed) {
+    console.warn('[email-guard] auth email blocked', guard)
+    await supabase.from('email_send_log').insert({
+      message_id: messageId,
+      template_name: emailType,
+      recipient_email: payload.data.email,
+      status: 'blocked_dev',
+    })
+    return new Response(JSON.stringify({ success: false, reason: guard.reason }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   const { error: enqueueError } = await supabase.rpc('enqueue_email', {
     queue_name: 'auth_emails',
     payload: {
@@ -258,14 +278,15 @@ async function handleWebhook(req: Request): Promise<Response> {
       to: payload.data.email,
       from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
       sender_domain: SENDER_DOMAIN,
-      subject: EMAIL_SUBJECTS[emailType] || 'Notification',
-      html,
+      subject: decorateDevSubject(EMAIL_SUBJECTS[emailType] || 'Notification'),
+      html: html + devFooterHtml(),
       text,
       purpose: 'transactional',
       label: emailType,
       queued_at: new Date().toISOString(),
     },
   })
+
 
   if (enqueueError) {
     console.error('Failed to enqueue auth email', { error: enqueueError, run_id, emailType })
@@ -297,6 +318,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
+
+  // Phase 0.5 environment gate
+  const envBlock = assertDevEnvironment()
+  if (envBlock) return envBlock
+
 
   // Route to preview handler for /preview path
   if (url.pathname.endsWith('/preview')) {
