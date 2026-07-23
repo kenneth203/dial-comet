@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const reconciledUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     const syncSignedInStatus = (signedInUserId: string) => {
       if (reconciledUserIdRef.current === signedInUserId) return;
       reconciledUserIdRef.current = signedInUserId;
@@ -40,7 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const setOfflineOnSignOut = (userId: string) => {
-      // Defer so we don't block the auth state change callback
       setTimeout(() => {
         void (async () => {
           try {
@@ -62,18 +62,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }, 0);
     };
 
+    const finishBootstrap = () => {
+      if (!mounted) return;
+      setIsLoading(false);
+      signalAuthReady();
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        // Capture previous user id before we overwrite state (needed for SIGNED_OUT)
+        if (!mounted) return;
         const previousUserId = reconciledUserIdRef.current;
 
         setSession(session);
         setUser(session?.user ?? null);
-        setIsLoading(false);
+        finishBootstrap();
 
         if (event === 'SIGNED_OUT') {
-          // Auto-set status to offline for ANY sign-out (idle timeout, token expiry,
-          // manual sign-out, etc.) so we never leave a stale online status behind.
           if (previousUserId) {
             setOfflineOnSignOut(previousUserId);
           }
@@ -86,23 +90,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    void asPromise(supabase.auth.getSession())
+    // Bounded settlement: getSession() is not AbortSignal-cancellable, but
+    // this guarantees the AuthProvider reaches a terminal loaded state within
+    // AUTH_BOOTSTRAP_TIMEOUT_MS regardless of the SDK's internal behaviour.
+    withTimeout(
+      asPromise(supabase.auth.getSession()),
+      AUTH_BOOTSTRAP_TIMEOUT_MS,
+      'supabase.auth.getSession',
+    )
       .then(({ data: { session } }) => {
+        if (!mounted) return;
         setSession((current) => current ?? session);
         setUser((current) => current ?? (session?.user ?? null));
-        setIsLoading(false);
-
         if (session?.user) {
           syncSignedInStatus(session.user.id);
         }
       })
       .catch((error) => {
-        console.error('Error loading auth session:', error);
-        setIsLoading(false);
+        console.error('[AuthProvider] session bootstrap failed:', error?.name);
+        // On timeout or hard failure, defensively drop any persisted state
+        // that might be causing the stall so the next boot starts clean.
+        try { clearProjectAuthStorage(); } catch { /* ignore */ }
+      })
+      .finally(() => {
+        finishBootstrap();
       });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
+
 
   const signOut = async () => {
     if (user) {
