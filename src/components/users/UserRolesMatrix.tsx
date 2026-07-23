@@ -147,11 +147,16 @@ export function UserRolesMatrix() {
 
   const saveChanges = async (module: string) => {
     setIsSaving(true);
-    try {
-      const denials: string[] = [];
-      let okCount = 0;
-      let noopCount = 0;
+    // Only server-confirmed outcomes (ok / noop) clear their pending change.
+    // Denied outcomes and any technical failure (RPC error, network failure,
+    // empty result) preserve the pending change so the user can review it.
+    const confirmedClearKeys = new Set<string>();
+    const denials: string[] = [];
+    let okCount = 0;
+    let noopCount = 0;
+    let technicalFailure = false;
 
+    try {
       for (const [key, changes] of pendingChanges.entries()) {
         const [permId, role] = key.split(':');
         const row = matrixData.find(r => r.id === permId && r.role === role);
@@ -167,27 +172,47 @@ export function UserRolesMatrix() {
         if (error) throw error;
 
         const result = Array.isArray(data) ? data[0] : data;
-        if (!result) continue;
-        if (result.outcome === 'ok') okCount++;
-        else if (result.outcome === 'noop') noopCount++;
-        else {
+        // Empty RPC response is a hard technical failure.
+        if (!result) {
+          throw new Error(`Permission update returned no result for ${row.feature} / ${role}`);
+        }
+
+        if (result.outcome === 'ok') {
+          okCount++;
+          confirmedClearKeys.add(key);
+        } else if (result.outcome === 'noop') {
+          noopCount++;
+          confirmedClearKeys.add(key);
+        } else {
           denials.push(`${row.feature} / ${role}: ${result.outcome_message ?? result.outcome_code}`);
         }
       }
+    } catch (error) {
+      technicalFailure = true;
+      console.error('Error saving:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save permissions. Unconfirmed changes have been preserved.',
+        variant: 'destructive',
+      });
+    }
 
-      const updated = new Map(pendingChanges);
-      for (const [key] of updated.entries()) {
-        const [permId] = key.split(':');
-        const row = matrixData.find(r => r.id === permId);
-        if (row?.section === module) updated.delete(key);
-      }
-      setPendingChanges(updated);
+    if (confirmedClearKeys.size > 0) {
+      setPendingChanges(prev => {
+        const next = new Map(prev);
+        for (const k of confirmedClearKeys) next.delete(k);
+        return next;
+      });
+    }
+
+    if (!technicalFailure) {
       setEditingModule(null);
-
       if (denials.length > 0) {
         toast({
           title: `${MODULE_LABELS[module]}: ${denials.length} change(s) denied`,
-          description: denials.slice(0, 4).join(' • ') + (denials.length > 4 ? ` (+${denials.length - 4} more)` : ''),
+          description:
+            denials.slice(0, 4).join(' • ') +
+            (denials.length > 4 ? ` (+${denials.length - 4} more)` : ''),
           variant: 'destructive',
         });
       } else {
@@ -196,13 +221,10 @@ export function UserRolesMatrix() {
           description: `${MODULE_LABELS[module]} permissions saved (${okCount} updated, ${noopCount} unchanged)`,
         });
       }
-      await fetchData();
-    } catch (error) {
-      console.error('Error saving:', error);
-      toast({ title: "Error", description: "Failed to save permissions", variant: "destructive" });
-    } finally {
-      setIsSaving(false);
     }
+
+    await fetchData();
+    setIsSaving(false);
   };
 
 
