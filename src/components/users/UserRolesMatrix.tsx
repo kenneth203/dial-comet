@@ -148,23 +148,33 @@ export function UserRolesMatrix() {
   const saveChanges = async (module: string) => {
     setIsSaving(true);
     try {
+      const denials: string[] = [];
+      let okCount = 0;
+      let noopCount = 0;
+
       for (const [key, changes] of pendingChanges.entries()) {
         const [permId, role] = key.split(':');
         const row = matrixData.find(r => r.id === permId && r.role === role);
         if (!row) continue;
-        // Only save changes for this module
         if (row.section !== module) continue;
-        
-        const { error } = await supabase.rpc('update_permission_grant', {
+
+        const { data, error } = await supabase.rpc('update_permission_grant', {
           p_permission_id: permId,
           p_role: role,
           p_granted: changes.granted ?? row.granted,
           p_scope: changes.scope ?? row.scope,
         });
         if (error) throw error;
+
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result) continue;
+        if (result.outcome === 'ok') okCount++;
+        else if (result.outcome === 'noop') noopCount++;
+        else {
+          denials.push(`${row.feature} / ${role}: ${result.outcome_message ?? result.outcome_code}`);
+        }
       }
 
-      // Clear pending changes for this module
       const updated = new Map(pendingChanges);
       for (const [key] of updated.entries()) {
         const [permId] = key.split(':');
@@ -173,7 +183,19 @@ export function UserRolesMatrix() {
       }
       setPendingChanges(updated);
       setEditingModule(null);
-      toast({ title: "Success", description: `${MODULE_LABELS[module]} permissions saved` });
+
+      if (denials.length > 0) {
+        toast({
+          title: `${MODULE_LABELS[module]}: ${denials.length} change(s) denied`,
+          description: denials.slice(0, 4).join(' • ') + (denials.length > 4 ? ` (+${denials.length - 4} more)` : ''),
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `${MODULE_LABELS[module]} permissions saved (${okCount} updated, ${noopCount} unchanged)`,
+        });
+      }
       await fetchData();
     } catch (error) {
       console.error('Error saving:', error);
@@ -182,6 +204,7 @@ export function UserRolesMatrix() {
       setIsSaving(false);
     }
   };
+
 
   const cancelEditing = () => {
     if (editingModule) {
