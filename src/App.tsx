@@ -57,6 +57,9 @@ import { AdditionalChargesProvider } from "@/context/AdditionalChargesContext";
 import { UserManagementProvider } from "@/context/UserManagementContext";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { PermissionGuard } from "@/components/common/PermissionGuard";
+import { DevEnvironmentBanner, DevEnvironmentBlockScreen } from "@/components/system/DevEnvironmentBanner";
+import { useIsDevEnvironment } from "@/lib/dev-environment";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,11 +79,17 @@ const PageLoader = () => (
   </div>
 );
 
-const App = () => (
+const App = () => {
+  const isDev = useIsDevEnvironment();
+  if (!isDev) return <DevEnvironmentBlockScreen />;
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <DevEnvironmentBanner />
+      <div style={{ paddingTop: 28 }}>
       <Toaster />
       <Sonner />
+
       <AuthProvider>
         <UsersProvider>
           <CustomersProvider>
