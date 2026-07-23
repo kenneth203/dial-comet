@@ -1,4 +1,7 @@
 import { sendLovableEmail } from 'npm:@lovable.dev/email-js'
+import { assertDevEnvironment } from '../_shared/env-guard.ts'
+import { assertEmailAllowed } from '../_shared/email-guard.ts'
+
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const MAX_RETRIES = 5
@@ -79,7 +82,10 @@ async function moveToDlq(
 }
 
 Deno.serve(async (req) => {
+  const envBlock = assertDevEnvironment()
+  if (envBlock) return envBlock
   const apiKey = Deno.env.get('LOVABLE_API_KEY')
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -248,9 +254,24 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Phase 0.5 last-line defence — re-check allowlist just before send
+      const guard = assertEmailAllowed({ to: payload.to, reply_to: payload.reply_to })
+      if (!guard.allowed) {
+        console.warn('[email-guard] dispatcher blocked send', { queue, guard })
+        await supabase.from('email_send_log').insert({
+          message_id: payload.message_id,
+          template_name: payload.label,
+          recipient_email: payload.to,
+          status: 'blocked_dev',
+        })
+        await supabase.rpc('delete_email', { queue_name: queue, message_id: msg.msg_id })
+        continue
+      }
+
       try {
         await sendLovableEmail(
           {
+
             run_id: payload.run_id,
             to: payload.to,
             from: payload.from,

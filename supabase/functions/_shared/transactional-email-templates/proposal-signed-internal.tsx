@@ -8,7 +8,7 @@ import type { TemplateEntry } from './registry.ts'
 import { EmailSignature } from './_signature.tsx'
 
 const SITE_NAME = 'The VA Team'
-const PORTAL_URL = 'https://portal.thevateam.co.uk'
+const PORTAL_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app'
 
 interface ProposalSignedInternalProps {
   clientName?: string
@@ -86,7 +86,7 @@ export const template = {
   component: ProposalSignedInternalEmail,
   subject: (d: Record<string, any>) =>
     `🎉 New sign-up: ${d.clientName || 'A client'} — ${d.serviceType || ''} ${d.packageName || ''}`.trim(),
-  to: 'kenneth@thevateam.co.uk',
+  to: 'dev-test-recipient@example.invalid',
   displayName: 'Proposal signed (internal)',
   previewData: {
     clientName: 'Jane Smith',

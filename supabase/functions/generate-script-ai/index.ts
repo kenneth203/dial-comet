@@ -6,6 +6,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+import { assertDevEnvironment, disabledInDevResponse } from '../_shared/env-guard.ts';
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const AI_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
@@ -28,6 +29,9 @@ RULES:
 - If information is missing for a section, skip that section entirely rather than writing "TBD".`;
 
 Deno.serve(async (req) => {
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+  return disabledInDevResponse('generate-script-ai');
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {

@@ -23,7 +23,7 @@ export const ReauthenticationEmail = ({ token }: ReauthenticationEmailProps) => 
     <Preview>Your verification code for The VA Team Portal</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Img src="https://portal.thevateam.co.uk/lovable-uploads/76e4bdc1-d3c0-4e93-bfc3-91c7c00ad781.png" alt="The VA Team" height="40" style={logo} />
+        <Img src="https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app/lovable-uploads/76e4bdc1-d3c0-4e93-bfc3-91c7c00ad781.png" alt="The VA Team" height="40" style={logo} />
         <Heading style={h1}>Confirm your identity</Heading>
         <Text style={text}>Use the code below to confirm your identity:</Text>
         <Text style={codeStyle}>{token}</Text>

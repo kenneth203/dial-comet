@@ -1,6 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
+import { assertDevEnvironment, disabledInDevResponse } from '../_shared/env-guard.ts';
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/github';
 
 interface GhCommit {
@@ -82,6 +83,9 @@ function handledGithubStatus(owner: string, repo: string, branch: unknown, err: 
 }
 
 Deno.serve(async (req) => {
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+  return disabledInDevResponse('github-status');
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {

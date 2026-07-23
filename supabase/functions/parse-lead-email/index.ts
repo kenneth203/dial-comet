@@ -2,6 +2,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 
+import { assertDevEnvironment, disabledInDevResponse } from '../_shared/env-guard.ts';
 interface ParsedLead {
   name?: string
   companyName?: string
@@ -45,6 +46,9 @@ No commentary, no markdown, just JSON.`
 
 
 Deno.serve(async (req) => {
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+  return disabledInDevResponse('parse-lead-email');
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }

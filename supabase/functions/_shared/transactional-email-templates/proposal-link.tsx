@@ -8,7 +8,7 @@ import type { TemplateEntry } from './registry.ts'
 import { EmailSignature } from './_signature.tsx'
 
 const SITE_NAME = 'The VA Team'
-const PORTAL_URL = 'https://portal.thevateam.co.uk'
+const PORTAL_URL = Deno.env.get('APP_PUBLIC_URL') ?? 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app'
 
 interface ProposalLinkProps {
   clientName?: string
@@ -113,7 +113,7 @@ export const template = {
   previewData: {
     clientName: 'Jane Smith',
     serviceLabel: 'Virtual Assistant',
-    proposalUrl: 'https://portal.thevateam.co.uk/proposal/abc123',
+    proposalUrl: 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app/proposal/abc123',
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     personalMessage: 'As discussed on our call earlier today.',
   },

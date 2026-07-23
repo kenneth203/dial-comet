@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { assertPublicEndpointAllowed } from '../_shared/public-endpoint-guard.ts';
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -13,6 +14,8 @@ function generateToken(length = 32): string {
 }
 
 Deno.serve(async (req) => {
+  const guard = assertPublicEndpointAllowed(req);
+  if (guard) return guard;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

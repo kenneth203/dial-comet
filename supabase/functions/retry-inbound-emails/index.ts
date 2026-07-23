@@ -5,9 +5,13 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { processInboundEmail } from '../_shared/inbound-email.ts'
 
+import { assertDevEnvironment, disabledInDevResponse } from '../_shared/env-guard.ts';
 const MAX_ATTEMPTS = 5
 
 Deno.serve(async (req) => {
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+  return disabledInDevResponse('retry-inbound-emails');
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')

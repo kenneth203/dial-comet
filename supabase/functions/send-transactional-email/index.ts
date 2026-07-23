@@ -2,6 +2,9 @@ import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
+import { assertDevEnvironment } from '../_shared/env-guard.ts'
+import { assertEmailAllowed, decorateDevSubject, devFooterHtml } from '../_shared/email-guard.ts'
+
 
 // Configuration baked in at scaffold time — do NOT change these manually.
 // To update, re-run the email domain setup flow.
@@ -31,10 +34,15 @@ function generateToken(): string {
 }
 
 Deno.serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
+  // Phase 0.5 environment gate
+  const envBlock = assertDevEnvironment();
+  if (envBlock) return envBlock;
+
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -149,17 +157,10 @@ Deno.serve(async (req) => {
   // Templates that should always BCC Kenneth so he has a record of every outbound copy.
   // We send a separate "[Copy]" email rather than a true SMTP BCC so it shows up cleanly
   // in his inbox AND in the email_send_log for audit purposes.
-  const ALWAYS_BCC_KENNETH: string[] = [
-    'customer-form-link',
-    'proposal-link',
-    'proposal-invoice',
-  ]
-  if (templateName && ALWAYS_BCC_KENNETH.includes(templateName)) {
-    const kenneth = 'kenneth@thevateam.co.uk'
-    if (!bccEmails.map((e) => e.toLowerCase()).includes(kenneth)) {
-      bccEmails.push(kenneth)
-    }
-  }
+  // Phase 0.5: hard-coded Kenneth BCC removed. Notification copies must be
+  // controlled through DEV_EMAIL_ALLOWLIST / DEV_NOTIFICATIONS_TO and pass
+  // the email guard below.
+
 
   if (!templateName) {
     return new Response(
@@ -394,21 +395,41 @@ Deno.serve(async (req) => {
   )
 
   // Resolve subject — supports static string or dynamic function
-  const resolvedSubject =
+  const rawSubject =
     typeof template.subject === 'function'
       ? template.subject(templateData)
       : template.subject
+  const resolvedSubject = decorateDevSubject(rawSubject)
+  const devHtml = html + devFooterHtml()
+
+  // Phase 0.5 email guard — checks to/cc/bcc/reply_to against DEV_EMAIL_ALLOWLIST
+  const guardResult = assertEmailAllowed({
+    to: effectiveRecipient,
+    bcc: bccEmails,
+    reply_to: replyTo,
+  })
+  if (!guardResult.allowed) {
+    await supabase.from('email_send_log').insert({
+      message_id: messageId,
+      template_name: templateName,
+      recipient_email: effectiveRecipient,
+      status: 'blocked_dev',
+    })
+    console.warn('[email-guard] blocked send', guardResult)
+    return new Response(
+      JSON.stringify({ success: false, reason: guardResult.reason, blocked: guardResult.blocked }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
 
   // 5. Enqueue the pre-rendered email for async processing by the dispatcher.
-  // The dispatcher (process-email-queue) handles sending, retries, and rate-limit backoff.
-
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
   await supabase.from('email_send_log').insert({
     message_id: messageId,
     template_name: templateName,
     recipient_email: effectiveRecipient,
     status: 'pending',
   })
+
 
   const { error: enqueueError } = await supabase.rpc('enqueue_email', {
     queue_name: 'transactional_emails',
@@ -418,7 +439,7 @@ Deno.serve(async (req) => {
       from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
       sender_domain: SENDER_DOMAIN,
       subject: resolvedSubject,
-      html,
+      html: devHtml,
       text: plainText,
       purpose: 'transactional',
       label: templateName,
@@ -514,7 +535,7 @@ Deno.serve(async (req) => {
           from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
           sender_domain: SENDER_DOMAIN,
           subject: bccSubject,
-          html,
+          html: devHtml,
           text: plainText,
           purpose: 'transactional',
           label: `${templateName}-bcc`,
