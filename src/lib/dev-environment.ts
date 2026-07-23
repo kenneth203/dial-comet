@@ -6,18 +6,25 @@
 // app to the confirmed Remix preview origin or localhost.
 
 export const DEV_ENV_VALUE = 'development';
-const REMIX_PREVIEW_ORIGIN = 'https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app';
+const REMIX_PROJECT_ID = '8b31b9e2-c03e-432c-8f58-7a093ded151c';
 
 function isAllowedDevOrigin(): boolean {
   if (typeof window === 'undefined') return false;
 
-  const { hostname, origin } = window.location;
-  return (
-    origin === REMIX_PREVIEW_ORIGIN ||
+  const { hostname } = window.location;
+  if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname === '::1'
-  );
+  ) {
+    return true;
+  }
+  // Allow any Lovable preview subdomain scoped to this Remix project id
+  // (e.g. id-preview--<id>.lovable.app, preview--<id>.lovable.app, <id>.lovableproject.com).
+  return (
+    hostname.endsWith('.lovable.app') ||
+    hostname.endsWith('.lovableproject.com')
+  ) && hostname.includes(REMIX_PROJECT_ID);
 }
 
 export function useIsDevEnvironment(): boolean {
