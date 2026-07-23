@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import type { PostgrestSingleResponse } from '@supabase/supabase-js';
 import { useAuth } from '@/context/AuthContext';
 import { asPromise } from '@/lib/supabaseRpc';
+import { withTimeout } from '@/lib/withTimeout';
+
+const PERMISSIONS_TIMEOUT_MS = 8_000;
 
 export type PermissionFeature =
   | 'menu_visible' | 'page_access' | 'view' | 'create'
@@ -65,25 +68,33 @@ export function usePermissions() {
   type ProfileRoleResponse = PostgrestSingleResponse<{ role: string | null }>;
   type PermissionsResponse = PostgrestSingleResponse<PermissionEntry[]>;
 
-  const { data, isLoading } = useQuery<PermissionsPayload>({
+  const { data, isLoading, isError } = useQuery<PermissionsPayload>({
     queryKey: ['permissions', user?.id ?? null],
     enabled: !!user,
-    // Permissions rarely change during a session; cache aggressively to avoid
-    // refetching on every PermissionGuard mount / route change.
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    retry: 1,
     queryFn: async () => {
       if (!user) return { permissions: [], role: null };
-      const profileRes = await asPromise(
-        supabase.from('profiles').select('role').eq('user_id', user.id).single()
-      ) as ProfileRoleResponse;
-      const permsRes = await asPromise(
-        supabase.rpc('get_my_permissions')
-      ) as PermissionsResponse;
+      // Bounded: if the RPC/query stalls, throw so react-query surfaces
+      // `isError` and the guard can render a Retry panel (not redirect).
+      const profileRes = await withTimeout(
+        asPromise(
+          supabase.from('profiles').select('role').eq('user_id', user.id).single()
+        ) as Promise<ProfileRoleResponse>,
+        PERMISSIONS_TIMEOUT_MS,
+        'profiles.select(role)',
+      );
+      const permsRes = await withTimeout(
+        asPromise(supabase.rpc('get_my_permissions')) as Promise<PermissionsResponse>,
+        PERMISSIONS_TIMEOUT_MS,
+        'rpc:get_my_permissions',
+      );
       if (permsRes.error) {
-        console.error('Error loading permissions:', permsRes.error);
+        console.error('Error loading permissions');
+        throw new Error('permissions_rpc_error');
       }
       return {
         permissions: (permsRes.data as PermissionEntry[] | null) ?? [],
@@ -145,6 +156,7 @@ export function usePermissions() {
     isMenuVisible,
     canAccessPage,
     isLoading,
+    isError,
     userRole,
     isSuperAdmin,
     isSupervisor,

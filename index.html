@@ -68,18 +68,86 @@
 
   <body>
     <div id="root">
-      <!-- Fallback content with critical styles for better perceived performance -->
-      <div class="critical-loading">
+      <!-- Static pre-React fallback. main.tsx removes this synchronously
+           after React mounts, so it cannot overlap the working app. -->
+      <div class="critical-loading" id="__critical_loading">
         <div style="
-          width: 32px; 
-          height: 32px; 
-          border: 3px solid hsl(var(--border)); 
-          border-top: 3px solid hsl(var(--primary)); 
-          border-radius: 50%; 
+          width: 32px;
+          height: 32px;
+          border: 3px solid hsl(var(--border));
+          border-top: 3px solid hsl(var(--primary));
+          border-radius: 50%;
           animation: spin 1s linear infinite;
         "></div>
       </div>
     </div>
+    <!-- Static failsafe: if React has not marked itself mounted within
+         ~15s, replace the spinner with a Reload / Clear-session panel.
+         Never reloads automatically. Removed once React mounts. -->
+    <div id="__static_failsafe" style="display:none;position:fixed;inset:0;z-index:2147483001;background:rgba(247,247,249,0.96);align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,sans-serif;">
+      <div style="max-width:480px;width:100%;padding:24px;background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+        <h1 style="margin:0;font-size:20px;font-weight:600;">Still loading…</h1>
+        <p style="margin-top:8px;color:#555;">
+          The application is taking longer than expected to start. You can reload,
+          or clear the local sign-in state and start fresh. Nothing will reload
+          automatically.
+        </p>
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="__static_reload" style="padding:10px 16px;border-radius:8px;background:#1c477a;color:white;border:0;cursor:pointer;font-weight:500;">Reload</button>
+          <button id="__static_clear" style="padding:10px 16px;border-radius:8px;background:white;color:#1c477a;border:1px solid #1c477a;cursor:pointer;font-weight:500;">Clear session &amp; retry</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var TIMEOUT_MS = 15000;
+        var recordReason = function (reason, source) {
+          try {
+            sessionStorage.setItem('app:last-reload', JSON.stringify({
+              reason: reason, source: source, ts: Date.now(),
+              route: location.pathname
+            }));
+          } catch (_) {}
+        };
+        var clearProjectKey = function () {
+          try {
+            var url = document.querySelector('meta[name="supabase-url"]');
+            // Best-effort key derivation from meta tag (optional); otherwise
+            // no-op — we never prefix-scan.
+            if (url && url.content) {
+              var ref = new URL(url.content).hostname.split('.')[0];
+              if (ref) localStorage.removeItem('sb-' + ref + '-auth-token');
+            }
+          } catch (_) {}
+        };
+        var timer = setTimeout(function () {
+          if (window.__reactMounted) return;
+          var el = document.getElementById('__static_failsafe');
+          if (el) el.style.display = 'flex';
+        }, TIMEOUT_MS);
+        window.__clearBootFailsafe = function () {
+          window.__reactMounted = true;
+          clearTimeout(timer);
+          var loading = document.getElementById('__critical_loading');
+          if (loading && loading.parentNode) loading.parentNode.removeChild(loading);
+          var failsafe = document.getElementById('__static_failsafe');
+          if (failsafe && failsafe.parentNode) failsafe.parentNode.removeChild(failsafe);
+        };
+        document.addEventListener('DOMContentLoaded', function () {
+          var reloadBtn = document.getElementById('__static_reload');
+          var clearBtn = document.getElementById('__static_clear');
+          if (reloadBtn) reloadBtn.addEventListener('click', function () {
+            recordReason('static-failsafe-reload', 'index.html');
+            location.reload();
+          });
+          if (clearBtn) clearBtn.addEventListener('click', function () {
+            clearProjectKey();
+            recordReason('static-failsafe-recover', 'index.html');
+            location.replace('/auth');
+          });
+        });
+      })();
+    </script>
     <style>
       @keyframes spin {
         0% { transform: rotate(0deg); }
