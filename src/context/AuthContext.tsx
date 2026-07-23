@@ -3,6 +3,16 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { reconcileSignedInStatus } from '@/lib/statusSync';
 import { asPromise } from '@/lib/supabaseRpc';
+import { withTimeout } from '@/lib/withTimeout';
+import { clearProjectAuthStorage } from '@/lib/boot-storage-guard';
+
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 8_000;
+
+function signalAuthReady() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('app:auth-ready'));
+  }
+}
 
 interface AuthContextType {
   user: User | null;
