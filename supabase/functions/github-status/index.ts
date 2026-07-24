@@ -83,10 +83,27 @@ function handledGithubStatus(owner: string, repo: string, branch: unknown, err: 
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
   const envBlock = assertDevEnvironment();
   if (envBlock) return envBlock;
-  return disabledInDevResponse('github-status');
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // Phase 0.5: GitHub connector is intentionally not configured in the dev Remix.
+  // Return a friendly 200 payload so the dashboard renders an empty state
+  // instead of a 500/blank screen.
+  if (!Deno.env.get('LOVABLE_API_KEY') || !Deno.env.get('GITHUB_API_KEY')) {
+    return jsonResponse({
+      ok: false,
+      error: 'GitHub connector is not configured in this development environment.',
+      repo: null,
+      branch: null,
+      branchError: null,
+      commit: null,
+      workflowError: null,
+      workflow_runs: [],
+      fetched_at: new Date().toISOString(),
+    });
+  }
 
   try {
     // Auth: verify JWT + Super-Admin role
