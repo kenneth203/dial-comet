@@ -1,12 +1,28 @@
 import { createRoot } from 'react-dom/client'
-import { StrictMode } from 'react'
-import App from './App.tsx'
+import { StrictMode, Suspense, lazy, useEffect } from 'react'
 import './index.css'
 import { HelmetProvider } from 'react-helmet-async'
 import { runBootStorageGuard } from '@/lib/boot-storage-guard'
 import { AppErrorBoundary } from '@/components/system/AppErrorBoundary'
 import { StartupConfigScreen } from '@/components/system/StartupConfigScreen'
 import { recordBootStart, attachLifecycleDiagnostics } from '@/lib/appReload'
+
+const App = lazy(() =>
+  import('./App.tsx').then((mod) => ({
+    default: function BootedApp() {
+      useEffect(() => {
+        clearFailsafe();
+      }, []);
+      return <mod.default />;
+    },
+  })),
+);
+
+const MainBootLoader = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 
 // Boot diagnostics — records last reload origin and lifecycle events.
 recordBootStart();
@@ -46,12 +62,11 @@ if (missingConfig.length > 0) {
     <StrictMode>
       <AppErrorBoundary>
         <HelmetProvider>
-          <App />
+          <Suspense fallback={<MainBootLoader />}>
+            <App />
+          </Suspense>
         </HelmetProvider>
       </AppErrorBoundary>
     </StrictMode>
   );
-  // Remove the pre-React fallback on the next paint frame, after React has
-  // committed its first render. Ensures no overlap with the working app.
-  requestAnimationFrame(() => clearFailsafe());
 }
