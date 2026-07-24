@@ -1,10 +1,29 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+const REMIX_BACKEND_URL = "https://hywkufdgabkmhgexfgnu.supabase.co";
+const REMIX_BACKEND_PUBLISHABLE_KEY = "sb_publishable_L0KkkJjZIe1jeqBSYvG0fA_zUrq7cNQ";
+const REMIX_BACKEND_PROJECT_ID = "hywkufdgabkmhgexfgnu";
+
+const requiredClientEnv = (mode: string) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(env.VITE_SUPABASE_URL || REMIX_BACKEND_URL),
+    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+      env.VITE_SUPABASE_PUBLISHABLE_KEY || REMIX_BACKEND_PUBLISHABLE_KEY,
+    ),
+    "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(
+      env.VITE_SUPABASE_PROJECT_ID || REMIX_BACKEND_PROJECT_ID,
+    ),
+    "import.meta.env.VITE_APP_ENV": JSON.stringify(env.VITE_APP_ENV || "development"),
+  };
+};
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: requiredClientEnv(mode),
   server: {
     host: "::",
     port: 8080,
