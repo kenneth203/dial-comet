@@ -4509,6 +4509,24 @@ export type Database = {
         Returns: string
       }
       admin_delete_system_user: { Args: { p_id: string }; Returns: undefined }
+      admin_reinstate_user: {
+        Args: { p_reason?: string; p_target_user_id: string }
+        Returns: {
+          message: string
+          outcome: string
+        }[]
+      }
+      admin_suspend_user: {
+        Args: {
+          p_reason: string
+          p_suspend_until?: string
+          p_target_user_id: string
+        }
+        Returns: {
+          message: string
+          outcome: string
+        }[]
+      }
       admin_update_system_user: {
         Args: {
           p_account_number?: string
@@ -5219,6 +5237,32 @@ export type Database = {
       get_user_display_name: {
         Args: { target_user_id: string }
         Returns: string
+      }
+      get_user_suspension_history: {
+        Args: { p_target_user_id: string }
+        Returns: {
+          action: string
+          actor_name: string
+          created_at: string
+          from_state: Database["public"]["Enums"]["suspension_state"]
+          id: string
+          reason: string
+          suspend_until: string
+          to_state: Database["public"]["Enums"]["suspension_state"]
+        }[]
+      }
+      get_user_suspension_overview: {
+        Args: never
+        Returns: {
+          actor_name: string
+          actor_user_id: string
+          is_suspended: boolean
+          reason: string
+          state: Database["public"]["Enums"]["suspension_state"]
+          state_entered_at: string
+          suspend_until: string
+          user_id: string
+        }[]
       }
       get_users_on_holiday_today: {
         Args: never
