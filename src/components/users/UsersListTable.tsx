@@ -66,6 +66,8 @@ export function UsersListTable() {
   const { user: currentAuthUser } = useAuth();
   const { isSuperAdmin, userRole } = usePermissions();
   const canManageAlerts = isSuperAdmin || userRole === "Admin";
+  // UI affordance only — the database functions re-check authority on every call.
+  const canManageSuspension = isSuperAdmin || userRole === "Admin";
 
   // Refresh relative timestamps every 30s
   useEffect(() => {
@@ -451,6 +453,14 @@ export function UsersListTable() {
       />
 
       {canManageAlerts && currentAuthUser?.id && (
+        <UserSuspensionDialog
+          open={suspensionDialogOpen}
+          onOpenChange={(o) => { setSuspensionDialogOpen(o); if (!o) setSuspensionTarget(null); }}
+          targetUser={suspensionTarget ? { user_id: suspensionTarget.user_id, name: suspensionTarget.name, email: suspensionTarget.email } : null}
+          suspension={suspensionTarget ? suspensions[suspensionTarget.user_id] ?? null : null}
+          onCompleted={async () => { await Promise.all([loadSuspensions(), loadUsers()]); }}
+        />
+
         <PresenceAlertSettingsDialog
           userId={currentAuthUser.id}
           open={alertSettingsOpen}
