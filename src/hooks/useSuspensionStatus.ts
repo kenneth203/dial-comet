@@ -35,7 +35,7 @@ const ACTIVE_STATUS: SuspensionStatus = {
 
 /** Resolve the current user's suspension status. Throws on network/timeout failure. */
 export async function fetchSuspensionStatus(): Promise<SuspensionStatus> {
-  const { data, error } = await withTimeout(
+  const { data, error } = await withTimeout<{ data: any; error: any }>(
     asPromise(supabase.rpc('get_my_suspension_status')),
     SUSPENSION_CHECK_TIMEOUT_MS,
     'get_my_suspension_status',
