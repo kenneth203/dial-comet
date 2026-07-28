@@ -452,15 +452,15 @@ export function UsersListTable() {
         onUserSaved={handleUserCreated}
       />
 
-      {canManageAlerts && currentAuthUser?.id && (
-        <UserSuspensionDialog
-          open={suspensionDialogOpen}
-          onOpenChange={(o) => { setSuspensionDialogOpen(o); if (!o) setSuspensionTarget(null); }}
-          targetUser={suspensionTarget ? { user_id: suspensionTarget.user_id, name: suspensionTarget.name, email: suspensionTarget.email } : null}
-          suspension={suspensionTarget ? suspensions[suspensionTarget.user_id] ?? null : null}
-          onCompleted={async () => { await Promise.all([loadSuspensions(), loadUsers()]); }}
-        />
+      <UserSuspensionDialog
+        open={suspensionDialogOpen}
+        onOpenChange={(o) => { setSuspensionDialogOpen(o); if (!o) setSuspensionTarget(null); }}
+        targetUser={suspensionTarget ? { user_id: suspensionTarget.user_id, name: suspensionTarget.name, email: suspensionTarget.email } : null}
+        suspension={suspensionTarget ? suspensions[suspensionTarget.user_id] ?? null : null}
+        onCompleted={async () => { await Promise.all([loadSuspensions(), loadUsers()]); }}
+      />
 
+      {canManageAlerts && currentAuthUser?.id && (
         <PresenceAlertSettingsDialog
           userId={currentAuthUser.id}
           open={alertSettingsOpen}
