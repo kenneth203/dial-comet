@@ -10,6 +10,7 @@ import { PresenceAlertSettingsDialog } from "./PresenceAlertSettingsDialog";
 import { UserSuspensionDialog, type SuspensionOverviewRow } from "./UserSuspensionDialog";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCanManageSuspension } from "@/hooks/useCanManageSuspension";
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -43,6 +44,16 @@ const formatRelative = (iso: string | null) => {
   return new Date(iso).toLocaleDateString('en-GB');
 };
 
+const SUSPENSION_LABELS: Record<string, string> = {
+  active: 'Active',
+  suspended: 'Suspended',
+  timed_suspended: 'Timed suspension',
+  expired: 'Suspension expired',
+  suspend_pending: 'Suspension pending',
+  unsuspend_pending: 'Reinstatement pending',
+  incident: 'Incident',
+};
+
 const formatExact = (iso: string | null) => {
   if (!iso) return 'No record';
   const d = new Date(iso);
@@ -66,8 +77,9 @@ export function UsersListTable() {
   const { user: currentAuthUser } = useAuth();
   const { isSuperAdmin, userRole } = usePermissions();
   const canManageAlerts = isSuperAdmin || userRole === "Admin";
-  // UI affordance only — the database functions re-check authority on every call.
-  const canManageSuspension = isSuperAdmin || userRole === "Admin";
+  // Mirrors the database predicate (Active Super-Admin). The database re-checks
+  // authority on every call and remains the final authority.
+  const { canManage: canManageSuspension } = useCanManageSuspension();
 
   // Refresh relative timestamps every 30s
   useEffect(() => {
@@ -322,25 +334,43 @@ export function UsersListTable() {
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {suspensions[user.user_id]?.is_suspended ? (
-                      <div className="space-y-1">
-                        <Badge variant="destructive" className="text-xs">Suspended</Badge>
-                        <div className="text-xs text-muted-foreground max-w-[220px]">
-                          <div className="truncate" title={suspensions[user.user_id]?.reason ?? ''}>
-                            {suspensions[user.user_id]?.reason || 'No reason recorded'}
+                    {(() => {
+                      const sus = suspensions[user.user_id];
+                      const eff = sus?.effective_status ?? 'active';
+                      if (!sus || eff === 'active') {
+                        return (
+                          <Badge variant={getStatusVariant(user.status) as any} className="text-xs">
+                            {user.status}
+                          </Badge>
+                        );
+                      }
+                      const variant =
+                        eff === 'suspended' || eff === 'timed_suspended' || eff === 'incident'
+                          ? 'destructive'
+                          : eff === 'expired'
+                            ? 'outline'
+                            : 'secondary';
+                      return (
+                        <div className="space-y-1">
+                          <Badge variant={variant as any} className="text-xs">
+                            {SUSPENSION_LABELS[eff] ?? eff}
+                          </Badge>
+                          <div className="text-xs text-muted-foreground max-w-[220px]">
+                            {sus.reason && (
+                              <div className="truncate" title={sus.reason}>{sus.reason}</div>
+                            )}
+                            <div>{formatExact(sus.state_entered_at)}</div>
+                            <div>By {sus.actor_name || 'Unknown'}</div>
+                            {sus.suspend_until && (
+                              <div>
+                                {eff === 'expired' ? 'Expired ' : 'Until '}
+                                {formatExact(sus.suspend_until)}
+                              </div>
+                            )}
                           </div>
-                          <div>{formatExact(suspensions[user.user_id]?.state_entered_at ?? null)}</div>
-                          <div>By {suspensions[user.user_id]?.actor_name || 'Unknown'}</div>
-                          {suspensions[user.user_id]?.suspend_until && (
-                            <div>Until {formatExact(suspensions[user.user_id]?.suspend_until ?? null)}</div>
-                          )}
                         </div>
-                      </div>
-                    ) : (
-                      <Badge variant={getStatusVariant(user.status) as any} className="text-xs">
-                        {user.status}
-                      </Badge>
-                    )}
+                      );
+                    })()}
                   </TableCell>
                   {(() => {
                     const p = presence[user.user_id];
@@ -400,6 +430,7 @@ export function UsersListTable() {
                           onClick={() => { setSuspensionTarget(user); setSuspensionDialogOpen(true); }}
                           className="h-8 w-8 p-0"
                           title={suspensions[user.user_id]?.is_suspended ? 'Reinstate User' : 'Suspend User'}
+                          aria-label={suspensions[user.user_id]?.is_suspended ? 'Reinstate User' : 'Suspend User'}
                         >
                           {suspensions[user.user_id]?.is_suspended
                             ? <ShieldCheck className="h-4 w-4 text-emerald-600" />
