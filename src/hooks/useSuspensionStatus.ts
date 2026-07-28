@@ -124,8 +124,15 @@ export function useSuspensionStatus(userId: string | null | undefined): UseSuspe
         setPhase('error');
       });
 
+    // Re-check on session refresh so a suspension applied mid-session is
+    // enforced without requiring a full reload.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') setAttempt((n) => n + 1);
+    });
+
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
   }, [userId, attempt]);
 
