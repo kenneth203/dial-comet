@@ -21,8 +21,10 @@ export interface SuspensionStatus {
   reason: string | null;
   state_entered_at: string | null;
   suspend_until: string | null;
-  /** Computed effective status (lazy expiry applied, no database write). */
+  /** Computed effective status (expiry reconciled server-side). */
   is_suspended: boolean;
+  /** 'active' | 'suspended' | 'timed_suspended' | 'expired' | pending | 'incident' */
+  effective_status: string;
 }
 
 const ACTIVE_STATUS: SuspensionStatus = {
@@ -31,6 +33,7 @@ const ACTIVE_STATUS: SuspensionStatus = {
   state_entered_at: null,
   suspend_until: null,
   is_suspended: false,
+  effective_status: 'active',
 };
 
 /** Resolve the current user's suspension status. Throws on network/timeout failure. */
@@ -51,7 +54,8 @@ export async function fetchSuspensionStatus(): Promise<SuspensionStatus> {
     reason: row.reason ?? null,
     state_entered_at: row.state_entered_at ?? null,
     suspend_until: row.suspend_until ?? null,
-    is_suspended: row.is_suspended === true,
+    is_suspended: row.is_suspended === true && row.effective_status !== 'expired',
+    effective_status: typeof row.effective_status === 'string' ? row.effective_status : 'active',
   };
 }
 
