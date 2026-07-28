@@ -10,11 +10,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Loader2, Info, AlertTriangle } from "lucide-react";
+import { beginSuspendedSession, fetchSuspensionStatus } from "@/hooks/useSuspensionStatus";
+import { clearSuspensionDisplayState } from "@/lib/suspensionSession";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [suspensionPending, setSuspensionPending] = useState(false);
   const [extensionWarning, setExtensionWarning] = useState(false);
   const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
@@ -23,10 +26,10 @@ export default function Auth() {
   const idleReason = searchParams.get("reason") === "idle";
 
   useEffect(() => {
-    if (!isAuthLoading && user) {
+    if (!isAuthLoading && user && !suspensionPending) {
       navigate("/", { replace: true });
     }
-  }, [user, isAuthLoading, navigate]);
+  }, [user, isAuthLoading, navigate, suspensionPending]);
 
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -78,6 +81,23 @@ export default function Auth() {
         // Success — clear the failed-attempt counter for this email
         await Promise.resolve(supabase.rpc("clear_failed_logins", { p_email: email })).catch(() => {});
         setExtensionWarning(false);
+
+        // App-layer suspension enforcement: confirm the account is active
+        // before allowing entry into the portal.
+        try {
+          const status = await fetchSuspensionStatus();
+          if (status.is_suspended) {
+            setSuspensionPending(true);
+            navigate("/account-suspended", { replace: true });
+            await beginSuspendedSession(status);
+            return;
+          }
+          clearSuspensionDisplayState();
+        } catch (suspensionError) {
+          // Do not falsely suspend on a network/timeout failure — ProtectedRoute
+          // resolves the status again and shows a bounded retry state.
+          console.error("[Auth] suspension check failed:", suspensionError);
+        }
       }
     } catch (error: any) {
       toast({

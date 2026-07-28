@@ -4353,6 +4353,7 @@ export type Database = {
           reason: string | null
           state: Database["public"]["Enums"]["suspension_state"]
           state_entered_at: string
+          suspend_until: string | null
           updated_at: string
           user_id: string
           version: number
@@ -4365,6 +4366,7 @@ export type Database = {
           reason?: string | null
           state?: Database["public"]["Enums"]["suspension_state"]
           state_entered_at?: string
+          suspend_until?: string | null
           updated_at?: string
           user_id: string
           version?: number
@@ -4377,6 +4379,7 @@ export type Database = {
           reason?: string | null
           state?: Database["public"]["Enums"]["suspension_state"]
           state_entered_at?: string
+          suspend_until?: string | null
           updated_at?: string
           user_id?: string
           version?: number
@@ -5105,6 +5108,16 @@ export type Database = {
           granted: boolean
           scope: string
           section: string
+        }[]
+      }
+      get_my_suspension_status: {
+        Args: never
+        Returns: {
+          is_suspended: boolean
+          reason: string
+          state: Database["public"]["Enums"]["suspension_state"]
+          state_entered_at: string
+          suspend_until: string
         }[]
       }
       get_my_system_user_id: { Args: never; Returns: string }
