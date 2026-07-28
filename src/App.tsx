@@ -35,6 +35,7 @@ const GitHubStatus = lazy(() => import("./pages/GitHubStatus"));
 const ChecklistComplianceReport = lazy(() => import("./pages/ChecklistComplianceReport"));
 
 const Auth = lazy(() => import("./pages/Auth"));
+const AccountSuspended = lazy(() => import("./pages/AccountSuspended"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ShiftScheduler = lazy(() => import("./pages/ShiftScheduler"));
@@ -106,6 +107,7 @@ const App = () => {
                         <Suspense fallback={<PageLoader />}>
                           <Routes>
                             <Route path="/auth" element={<Auth />} />
+                            <Route path="/account-suspended" element={<AccountSuspended />} />
                             <Route path="/forgot-password" element={<ForgotPassword />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
                             <Route path="/proposal/:token" element={<Proposal />} />
