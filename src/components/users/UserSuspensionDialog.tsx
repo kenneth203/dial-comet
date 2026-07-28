@@ -82,7 +82,7 @@ export function UserSuspensionDialog({ open, onOpenChange, targetUser, suspensio
     if (!targetUser) return;
     setHistoryLoading(true);
     setHistoryError(false);
-    const { data, error: err } = await asPromise(
+    const { data, error: err } = await asPromise<any>(
       supabase.rpc("get_user_suspension_history", { p_target_user_id: targetUser.user_id })
     );
     if (err) setHistoryError(true);
@@ -111,11 +111,11 @@ export function UserSuspensionDialog({ open, onOpenChange, targetUser, suspensio
     setSubmitting(true);
     try {
       const { data, error: err } = isSuspended
-        ? await asPromise(supabase.rpc("admin_reinstate_user", {
+        ? await asPromise<any>(supabase.rpc("admin_reinstate_user", {
             p_target_user_id: targetUser.user_id,
             p_reason: reason.trim() || null,
           }))
-        : await asPromise(supabase.rpc("admin_suspend_user", {
+        : await asPromise<any>(supabase.rpc("admin_suspend_user", {
             p_target_user_id: targetUser.user_id,
             p_reason: reason.trim(),
             p_suspend_until: mode === "timed" ? new Date(until).toISOString() : null,
