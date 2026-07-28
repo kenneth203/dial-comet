@@ -4597,6 +4597,7 @@ export type Database = {
       }
       can_access_sensitive_financial_data: { Args: never; Returns: boolean }
       can_access_task: { Args: { p_task_id: string }; Returns: boolean }
+      can_manage_user_suspension: { Args: never; Returns: boolean }
       cancel_holiday_request_secure: {
         Args: { request_id: string }
         Returns: boolean
@@ -5131,6 +5132,7 @@ export type Database = {
       get_my_suspension_status: {
         Args: never
         Returns: {
+          effective_status: string
           is_suspended: boolean
           reason: string
           state: Database["public"]["Enums"]["suspension_state"]
@@ -5256,6 +5258,7 @@ export type Database = {
         Returns: {
           actor_name: string
           actor_user_id: string
+          effective_status: string
           is_suspended: boolean
           reason: string
           state: Database["public"]["Enums"]["suspension_state"]
@@ -5347,6 +5350,12 @@ export type Database = {
           message: Json
           msg_id: number
           read_ct: number
+        }[]
+      }
+      reconcile_expired_suspensions: {
+        Args: { p_user_id?: string }
+        Returns: {
+          reconciled_count: number
         }[]
       }
       record_failed_login: { Args: { p_email: string }; Returns: undefined }

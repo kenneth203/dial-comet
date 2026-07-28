@@ -21,6 +21,8 @@ export interface SuspensionOverviewRow {
   actor_user_id: string | null;
   actor_name: string | null;
   is_suspended: boolean;
+  /** Effective status derived from suspend_until, not just the stored enum. */
+  effective_status?: string;
 }
 
 interface HistoryRow {
@@ -53,10 +55,16 @@ const ACTION_LABELS: Record<string, string> = {
   execute_start: "Started",
   complete_success: "Completed",
   complete_failure: "Failed",
+  expire: "Expired",
+  expire_timed: "Timed suspension expired",
 };
 
 export function UserSuspensionDialog({ open, onOpenChange, targetUser, suspension, onCompleted }: Props) {
-  const isSuspended = !!suspension?.is_suspended;
+  const effective = suspension?.effective_status
+    ?? (suspension?.is_suspended ? "suspended" : "active");
+  // An expired timed suspension is NOT active: no Reinstate action is offered.
+  const isSuspended = !!suspension?.is_suspended && effective !== "expired";
+  const isExpired = effective === "expired";
   const [reason, setReason] = useState("");
   const [mode, setMode] = useState<"manual" | "timed">("manual");
   const [until, setUntil] = useState("");
@@ -150,9 +158,22 @@ export function UserSuspensionDialog({ open, onOpenChange, targetUser, suspensio
           </DialogDescription>
         </DialogHeader>
 
+        {isExpired && suspension && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-1">
+            <Badge variant="outline" className="text-xs">Suspension expired</Badge>
+            <div><span className="text-muted-foreground">Previous reason:</span> {suspension.reason || "—"}</div>
+            <div><span className="text-muted-foreground">Expired:</span> {fmt(suspension.suspend_until)}</div>
+            <div className="text-muted-foreground">
+              This timed suspension has ended and the user is active again.
+            </div>
+          </div>
+        )}
+
         {isSuspended && suspension && (
           <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-1">
-            <Badge variant="destructive" className="text-xs">Suspended</Badge>
+            <Badge variant="destructive" className="text-xs">
+              {effective === "timed_suspended" ? "Timed suspension" : "Suspended"}
+            </Badge>
             <div><span className="text-muted-foreground">Reason:</span> {suspension.reason || "—"}</div>
             <div><span className="text-muted-foreground">Suspended:</span> {fmt(suspension.state_entered_at)}</div>
             <div><span className="text-muted-foreground">Suspended by:</span> {suspension.actor_name || "—"}</div>
