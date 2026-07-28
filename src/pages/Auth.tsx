@@ -15,6 +15,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [suspensionPending, setSuspensionPending] = useState(false);
   const [extensionWarning, setExtensionWarning] = useState(false);
   const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
@@ -23,10 +24,10 @@ export default function Auth() {
   const idleReason = searchParams.get("reason") === "idle";
 
   useEffect(() => {
-    if (!isAuthLoading && user) {
+    if (!isAuthLoading && user && !suspensionPending) {
       navigate("/", { replace: true });
     }
-  }, [user, isAuthLoading, navigate]);
+  }, [user, isAuthLoading, navigate, suspensionPending]);
 
 
   const handleSignIn = async (e: React.FormEvent) => {
