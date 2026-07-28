@@ -3,10 +3,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Edit, Trash2, Search, Eye, Plus, UserPlus, Shield, RefreshCw, Bell } from "lucide-react";
+import { Edit, Trash2, Search, Eye, Plus, UserPlus, Shield, RefreshCw, Bell, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { EnhancedUserDialog } from "./EnhancedUserDialog";
 import { PresenceAlertSettingsDialog } from "./PresenceAlertSettingsDialog";
+import { UserSuspensionDialog, type SuspensionOverviewRow } from "./UserSuspensionDialog";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -59,6 +60,9 @@ export function UsersListTable() {
   const [isLoading, setIsLoading] = useState(true);
   const [, setTick] = useState(0);
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false);
+  const [suspensionDialogOpen, setSuspensionDialogOpen] = useState(false);
+  const [suspensionTarget, setSuspensionTarget] = useState<SystemUser | null>(null);
+  const [suspensions, setSuspensions] = useState<Record<string, SuspensionOverviewRow>>({});
   const { user: currentAuthUser } = useAuth();
   const { isSuperAdmin, userRole } = usePermissions();
   const canManageAlerts = isSuperAdmin || userRole === "Admin";
@@ -84,6 +88,16 @@ export function UsersListTable() {
     setPresence(map);
   };
 
+  const loadSuspensions = async () => {
+    const { data, error } = await supabase.rpc('get_user_suspension_overview');
+    if (error) return; // non-authorised administrators simply see no controls
+    const map: Record<string, SuspensionOverviewRow> = {};
+    ((data as SuspensionOverviewRow[] | null) ?? []).forEach((row) => {
+      map[row.user_id] = row;
+    });
+    setSuspensions(map);
+  };
+
   const loadUsers = async () => {
     try {
       setIsLoading(true);
@@ -107,6 +121,7 @@ export function UsersListTable() {
   useEffect(() => {
     loadUsers();
     loadPresence();
+    loadSuspensions();
     const channel = supabase
       .channel(`users-list-presence-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_statuses' }, () => {
@@ -305,9 +320,25 @@ export function UsersListTable() {
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <Badge variant={getStatusVariant(user.status) as any} className="text-xs">
-                      {user.status}
-                    </Badge>
+                    {suspensions[user.user_id]?.is_suspended ? (
+                      <div className="space-y-1">
+                        <Badge variant="destructive" className="text-xs">Suspended</Badge>
+                        <div className="text-xs text-muted-foreground max-w-[220px]">
+                          <div className="truncate" title={suspensions[user.user_id]?.reason ?? ''}>
+                            {suspensions[user.user_id]?.reason || 'No reason recorded'}
+                          </div>
+                          <div>{formatExact(suspensions[user.user_id]?.state_entered_at ?? null)}</div>
+                          <div>By {suspensions[user.user_id]?.actor_name || 'Unknown'}</div>
+                          {suspensions[user.user_id]?.suspend_until && (
+                            <div>Until {formatExact(suspensions[user.user_id]?.suspend_until ?? null)}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <Badge variant={getStatusVariant(user.status) as any} className="text-xs">
+                        {user.status}
+                      </Badge>
+                    )}
                   </TableCell>
                   {(() => {
                     const p = presence[user.user_id];
@@ -360,6 +391,19 @@ export function UsersListTable() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
+                      {canManageSuspension && user.user_id !== currentAuthUser?.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setSuspensionTarget(user); setSuspensionDialogOpen(true); }}
+                          className="h-8 w-8 p-0"
+                          title={suspensions[user.user_id]?.is_suspended ? 'Reinstate User' : 'Suspend User'}
+                        >
+                          {suspensions[user.user_id]?.is_suspended
+                            ? <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                            : <ShieldAlert className="h-4 w-4" />}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
