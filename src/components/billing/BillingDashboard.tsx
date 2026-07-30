@@ -9,6 +9,15 @@ import { Users, Phone, FileText, PoundSterling, TrendingUp, Calendar, Shield } f
 import { secureLog } from "@/lib/secureLogger";
 import { useSecureBillingDashboard } from "@/hooks/useSecureBillingDashboard";
 import { formatGBP } from "@/lib/currency";
+import { InvoiceTotalsStrip } from "@/components/reports/InvoiceTotalsStrip";
+
+/** ISO date 12 months back, used for the combined invoice strip. */
+function twelveMonthsAgoIso(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 12);
+  return d.toISOString().slice(0, 10);
+}
+
 
 interface DashboardStats {
   totalCustomers: number;
@@ -283,6 +292,9 @@ export function BillingDashboard() {
         </button>
       </div>
       
+      {/* Combined CRM + Billing invoice figures (shared reporting source) */}
+      <InvoiceTotalsStrip periodLabel="Last 12 months" from={twelveMonthsAgoIso()} />
+
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>

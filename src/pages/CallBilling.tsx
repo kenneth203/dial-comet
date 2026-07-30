@@ -15,6 +15,7 @@ import { UnifiedPeriodsTab } from "@/components/billing/UnifiedPeriodsTab";
 import { UnifiedInvoicesTab } from "@/components/billing/UnifiedInvoicesTab";
 import { UnifiedBillingReports } from "@/components/billing/UnifiedBillingReports";
 import { MonthlyCallBillingReport } from "@/components/billing/MonthlyCallBillingReport";
+import { CombinedInvoicesReport } from "@/components/reports/CombinedInvoicesReport";
 import { StandardNavigation } from "@/components/common/StandardNavigation";
 import GradientBackdrop from "@/components/common/GradientBackdrop";
 import { Phone, Users, Settings, Calendar, Receipt, LineChart, BarChart3 } from "lucide-react";
@@ -125,6 +126,10 @@ export default function CallBilling() {
               <LineChart className="h-4 w-4 flex-shrink-0" />
               <span>Reports</span>
             </TabsTrigger>
+            <TabsTrigger value="all-invoices" className="flex items-center gap-1.5 whitespace-nowrap">
+              <Receipt className="h-4 w-4 flex-shrink-0" />
+              <span>All Invoices</span>
+            </TabsTrigger>
             <TabsTrigger value="call-report" className="flex items-center gap-1.5 whitespace-nowrap">
               <Receipt className="h-4 w-4 flex-shrink-0" />
               <span>Call Billing Report</span>
@@ -162,6 +167,10 @@ export default function CallBilling() {
 
         <TabsContent value="reports">
           <UnifiedBillingReports />
+        </TabsContent>
+
+        <TabsContent value="all-invoices">
+          <CombinedInvoicesReport />
         </TabsContent>
 
         <TabsContent value="call-report">
