@@ -367,18 +367,24 @@ export const useChat = () => {
           [roomId]: [...withoutTemp, { ...data, sender: { id: user.id, name: senderName }, attachments: uploadedAttachments }],
         };
       });
-    } catch (error) {
+      return true;
+    } catch (error: any) {
       console.error('Error sending message:', error);
       // Roll back optimistic message
       setMessagesMap(prev => ({
         ...prev,
         [roomId]: (prev[roomId] || []).filter(m => m.id !== tempId),
       }));
+      const msg = String(error?.message || '');
+      const isAuth = error?.code === 'PGRST301' || /jwt|jwsError|auth|permission|row-level security/i.test(msg);
       toast({
-        title: 'Error',
-        description: 'Failed to send message',
+        title: isAuth ? 'Session expired' : 'Error',
+        description: isAuth
+          ? 'Your session has expired. Please sign in again to send messages.'
+          : (msg || 'Failed to send message'),
         variant: 'destructive'
       });
+      return false;
     } finally {
       setSending(false);
     }
