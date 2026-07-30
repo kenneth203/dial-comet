@@ -27,7 +27,7 @@ interface UploadItem {
 
 interface MessageComposerProps {
   roomId: string;
-  onSend: (content: string, files?: File[] | { preUploaded: UploadedAttachment[] }) => void;
+  onSend: (content: string, files?: File[] | { preUploaded: UploadedAttachment[] }) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
 }
 
