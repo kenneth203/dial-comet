@@ -5,6 +5,7 @@ import { reconcileSignedInStatus } from '@/lib/statusSync';
 import { asPromise } from '@/lib/supabaseRpc';
 import { withTimeout } from '@/lib/withTimeout';
 import { clearProjectAuthStorage } from '@/lib/boot-storage-guard';
+import { hasSuspensionDisplayState } from '@/lib/suspensionSession';
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 8_000;
 
