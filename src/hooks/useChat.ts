@@ -277,6 +277,14 @@ export const useChat = () => {
     const trimmed = content.trim();
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({
+        title: 'Session expired',
+        description: 'Your session has expired. Please sign in again to send messages.',
+        variant: 'destructive'
+      });
+      return false;
+    }
     const { data: displayName } = await supabase.rpc('get_user_display_name', { target_user_id: user.id });
     const senderName =
       (displayName as string | null) ||
