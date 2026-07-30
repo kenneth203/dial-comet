@@ -266,12 +266,12 @@ export const useChat = () => {
     content: string,
     filesOrUploaded?: File[] | { preUploaded: import('@/lib/chatUpload').UploadedAttachment[] }
   ) => {
-    if (!user || !activeRoom) return;
+    if (!user || !activeRoom) return false;
     const hasText = content.trim().length > 0;
     const preUploaded = filesOrUploaded && !Array.isArray(filesOrUploaded) ? filesOrUploaded.preUploaded : undefined;
     const files = Array.isArray(filesOrUploaded) ? filesOrUploaded : undefined;
     const hasFiles = (!!files && files.length > 0) || (!!preUploaded && preUploaded.length > 0);
-    if (!hasText && !hasFiles) return;
+    if (!hasText && !hasFiles) return false;
 
     const roomId = activeRoom.id;
     const trimmed = content.trim();
