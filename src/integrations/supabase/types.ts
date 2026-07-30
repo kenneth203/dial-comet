@@ -4986,6 +4986,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_chat_unread_counts: {
+        Args: never
+        Returns: {
+          room_id: string
+          unread_count: number
+        }[]
+      }
       get_current_user_role: { Args: never; Returns: string }
       get_dm_candidates: {
         Args: never
@@ -5312,6 +5319,7 @@ export type Database = {
         Args: { action: string; employee_id: string }
         Returns: undefined
       }
+      mark_chat_room_read: { Args: { p_room_id: string }; Returns: number }
       mark_overdue_checklist: { Args: never; Returns: number }
       mark_reservation_executing: {
         Args: { p_reservation_id: string }
