@@ -5,6 +5,7 @@ import { reconcileSignedInStatus } from '@/lib/statusSync';
 import { asPromise } from '@/lib/supabaseRpc';
 import { withTimeout } from '@/lib/withTimeout';
 import { clearProjectAuthStorage } from '@/lib/boot-storage-guard';
+import { hasSuspensionDisplayState } from '@/lib/suspensionSession';
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 8_000;
 
@@ -90,6 +91,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
+    const isRefreshTokenFailure = (err: unknown) => {
+      const e = err as { code?: string; message?: string; __isAuthError?: boolean } | null;
+      if (!e) return false;
+      if (e.code === 'refresh_token_not_found' || e.code === 'refresh_token_already_used') return true;
+      return typeof e.message === 'string' && /refresh token/i.test(e.message);
+    };
+
+    // When the stored refresh token is invalid, Supabase throws
+    // AuthApiError('refresh_token_not_found'). In that state auth.uid() is null
+    // so every RLS-protected write (e.g. sending a chat message) silently fails
+    // and the optimistic UI rolls back. Force a clean sign-out and redirect to
+    // /auth so the user re-authenticates instead of typing into a dead session.
+    const forceReauth = () => {
+      // Never hijack the suspension sign-out flow, which deliberately signs the
+      // session out and routes to /account-suspended.
+      if (typeof window !== 'undefined') {
+        if (
+          window.location.pathname.startsWith('/account-suspended') ||
+          hasSuspensionDisplayState()
+        ) {
+          return;
+        }
+      }
+
+      setSession(null);
+      setUser(null);
+      reconciledUserIdRef.current = null;
+
+      if (typeof window !== 'undefined') {
+        const removeAuthEntries = (storage: Storage) => {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < storage.length; i += 1) {
+            const key = storage.key(i);
+            if (key?.startsWith('sb-') && key.endsWith('-auth-token')) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach((key) => storage.removeItem(key));
+        };
+
+        removeAuthEntries(window.localStorage);
+        removeAuthEntries(window.sessionStorage);
+
+        if (!window.location.pathname.startsWith('/auth')) {
+          window.location.assign('/auth');
+        }
+      }
+    };
+
     // Bounded settlement: getSession() is not AbortSignal-cancellable, but
     // this guarantees the AuthProvider reaches a terminal loaded state within
     // AUTH_BOOTSTRAP_TIMEOUT_MS regardless of the SDK's internal behaviour.
@@ -111,14 +161,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // On timeout or hard failure, defensively drop any persisted state
         // that might be causing the stall so the next boot starts clean.
         try { clearProjectAuthStorage(); } catch { /* ignore */ }
+        if (isRefreshTokenFailure(error)) forceReauth();
       })
       .finally(() => {
         finishBootstrap();
       });
 
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (isRefreshTokenFailure(event.reason)) forceReauth();
+    };
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
     };
   }, []);
 

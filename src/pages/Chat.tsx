@@ -22,7 +22,7 @@ export default function Chat() {
   } = useChat();
 
   const handleSendMessage: React.ComponentProps<typeof MessageComposer>['onSend'] = async (content, files) => {
-    await sendMessage(content, files as any);
+    return await sendMessage(content, files as any);
   };
 
   const handleMarkAsRead = async () => {

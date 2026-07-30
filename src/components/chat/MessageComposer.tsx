@@ -27,7 +27,7 @@ interface UploadItem {
 
 interface MessageComposerProps {
   roomId: string;
-  onSend: (content: string, files?: File[] | { preUploaded: UploadedAttachment[] }) => void;
+  onSend: (content: string, files?: File[] | { preUploaded: UploadedAttachment[] }) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
 }
 
@@ -130,7 +130,7 @@ export function MessageComposer({ roomId, onSend, disabled = false }: MessageCom
     startUpload(id, item.file);
   }, [startUpload]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (disabled) return;
     const hasText = message.trim().length > 0;
     const succeeded = items.filter(i => i.status === 'success' && i.uploaded);
@@ -150,11 +150,13 @@ export function MessageComposer({ roomId, onSend, disabled = false }: MessageCom
     }
     if (!hasText && succeeded.length === 0) return;
 
-    if (succeeded.length > 0) {
-      onSend(message.trim(), { preUploaded: succeeded.map(s => s.uploaded!) });
-    } else {
-      onSend(message.trim());
-    }
+    const result = succeeded.length > 0
+      ? await onSend(message.trim(), { preUploaded: succeeded.map(s => s.uploaded!) })
+      : await onSend(message.trim());
+
+    // Only clear the composer once the send actually succeeded, so a failed
+    // send keeps the user's text and attachments.
+    if (result === false) return;
 
     // Clear local state but DON'T remove from storage — they belong to the sent message now.
     items.forEach(i => {

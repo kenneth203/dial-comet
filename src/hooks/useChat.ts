@@ -74,6 +74,8 @@ export const useChat = () => {
   const roomsRef = useRef<ChatRoom[]>([]);
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const messagesMapRef = useRef<Record<string, ChatMessage[]>>({});
+  const markReadInFlightRef = useRef<Set<string>>(new Set());
+  const lastMarkReadAtRef = useRef<Record<string, number>>({});
   useEffect(() => { roomsRef.current = rooms; }, [rooms]);
   useEffect(() => { activeRoomRef.current = activeRoom; }, [activeRoom]);
   useEffect(() => { messagesMapRef.current = messagesMap; }, [messagesMap]);
@@ -264,17 +266,25 @@ export const useChat = () => {
     content: string,
     filesOrUploaded?: File[] | { preUploaded: import('@/lib/chatUpload').UploadedAttachment[] }
   ) => {
-    if (!user || !activeRoom) return;
+    if (!user || !activeRoom) return false;
     const hasText = content.trim().length > 0;
     const preUploaded = filesOrUploaded && !Array.isArray(filesOrUploaded) ? filesOrUploaded.preUploaded : undefined;
     const files = Array.isArray(filesOrUploaded) ? filesOrUploaded : undefined;
     const hasFiles = (!!files && files.length > 0) || (!!preUploaded && preUploaded.length > 0);
-    if (!hasText && !hasFiles) return;
+    if (!hasText && !hasFiles) return false;
 
     const roomId = activeRoom.id;
     const trimmed = content.trim();
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({
+        title: 'Session expired',
+        description: 'Your session has expired. Please sign in again to send messages.',
+        variant: 'destructive'
+      });
+      return false;
+    }
     const { data: displayName } = await supabase.rpc('get_user_display_name', { target_user_id: user.id });
     const senderName =
       (displayName as string | null) ||
@@ -365,18 +375,24 @@ export const useChat = () => {
           [roomId]: [...withoutTemp, { ...data, sender: { id: user.id, name: senderName }, attachments: uploadedAttachments }],
         };
       });
-    } catch (error) {
+      return true;
+    } catch (error: any) {
       console.error('Error sending message:', error);
       // Roll back optimistic message
       setMessagesMap(prev => ({
         ...prev,
         [roomId]: (prev[roomId] || []).filter(m => m.id !== tempId),
       }));
+      const msg = String(error?.message || '');
+      const isAuth = error?.code === 'PGRST301' || /jwt|jwsError|auth|permission|row-level security/i.test(msg);
       toast({
-        title: 'Error',
-        description: 'Failed to send message',
+        title: isAuth ? 'Session expired' : 'Error',
+        description: isAuth
+          ? 'Your session has expired. Please sign in again to send messages.'
+          : (msg || 'Failed to send message'),
         variant: 'destructive'
       });
+      return false;
     } finally {
       setSending(false);
     }
@@ -428,26 +444,20 @@ export const useChat = () => {
   const markAsRead = useCallback(async (roomId: string) => {
     if (!user || !roomId) return;
 
-    try {
-      // Mark all unread messages in this room as read
-      const { data: unreadMessages } = await supabase
-        .from('chat_messages')
-        .select('id')
-        .eq('room_id', roomId)
-        .neq('sender_id', user.id);
+    const now = Date.now();
+    if (markReadInFlightRef.current.has(roomId)) return;
+    if (now - (lastMarkReadAtRef.current[roomId] ?? 0) < 1500) return;
 
-      if (unreadMessages && unreadMessages.length > 0) {
-        const reads = unreadMessages.map(msg => ({
-          message_id: msg.id,
-          user_id: user.id,
-        }));
-        const { error } = await (supabase
-          .from('chat_message_reads') as any)
-          .upsert(reads, { onConflict: 'message_id,user_id', ignoreDuplicates: true });
-        if (error) throw error;
-      }
+    markReadInFlightRef.current.add(roomId);
+    lastMarkReadAtRef.current[roomId] = now;
+
+    try {
+      const { error } = await supabase.rpc('mark_chat_room_read' as any, { p_room_id: roomId });
+      if (error) throw error;
     } catch (err) {
       console.error('Error marking as read:', err);
+    } finally {
+      markReadInFlightRef.current.delete(roomId);
     }
   }, [user]);
 

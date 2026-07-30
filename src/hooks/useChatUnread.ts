@@ -25,60 +25,15 @@ export const useChatUnread = () => {
     try {
       setLoading(true);
 
-      // Rooms the user is a member of
-      const { data: membershipData, error: membershipError } = await supabase
-        .from('chat_room_members')
-        .select('room_id')
-        .eq('user_id', user.id);
-
-      if (membershipError) throw membershipError;
-
-      const roomIds = (membershipData ?? []).map(m => m.room_id);
-      roomIdsRef.current = roomIds;
-
-      if (roomIds.length === 0) {
-        setUnreadByRoom({});
-        return;
-      }
-
-      // Pull all messages in those rooms not sent by the user
-      const { data: messages, error: msgError } = await supabase
-        .from('chat_messages')
-        .select('id, room_id')
-        .in('room_id', roomIds)
-        .neq('sender_id', user.id);
-
-      if (msgError) throw msgError;
-
-      const allMessages = messages ?? [];
-      if (allMessages.length === 0) {
-        // Seed every room with 0 so consumers can read per-room counts safely
-        const seeded: Record<string, number> = {};
-        for (const id of roomIds) seeded[id] = 0;
-        setUnreadByRoom(seeded);
-        return;
-      }
-
-      // Read receipts the user already has
-      const messageIds = allMessages.map(m => m.id);
-      const { data: reads, error: readsError } = await (supabase
-        .from('chat_message_reads') as any)
-        .select('message_id')
-        .eq('user_id', user.id)
-        .in('message_id', messageIds);
-
-      if (readsError) throw readsError;
-
-      const readSet = new Set<string>((reads ?? []).map((r: any) => r.message_id as string));
-
       const counts: Record<string, number> = {};
-      for (const id of roomIds) counts[id] = 0;
-      for (const m of allMessages) {
-        if (!readSet.has(m.id)) {
-          counts[m.room_id] = (counts[m.room_id] ?? 0) + 1;
-        }
+      const { data, error } = await supabase.rpc('get_chat_unread_counts' as any);
+      if (error) throw error;
+
+      for (const row of (data ?? []) as Array<{ room_id: string; unread_count: number | string }>) {
+        counts[row.room_id] = Number(row.unread_count) || 0;
       }
 
+      roomIdsRef.current = Object.keys(counts);
       setUnreadByRoom(counts);
     } catch (error) {
       console.error('Error calculating unread messages:', error);
