@@ -1,191 +1,99 @@
-# Phase 0.5 — Development Safety Hardening Plan v1.2
+## Development Synchronisation Sprint 1 (Live → Development)
 
-Changes from v1.1: the public endpoint token guard is now controlled by a development feature flag rather than being permanently hard-coded. All other v1.1 amendments remain in force.
+Port six production hotfixes from Live into Development. No redesign, no refactor, no React Query, no file moves or renames, no unrelated cleanup. Where a Development file is newer, only the required Live change is merged in.
 
-Scope: harden this Remix so it cannot reach production customers, staff, inboxes, webhooks, AI providers, or third-party services. No feature work. No schema, migration, RLS, permission, table, or role changes. No user creation. No seed data insertion in this phase — design only.
+Verified before planning: Development still runs the pre-fix code in every area below, and `supabase/config.toml` stays untouched (your decision — no `verify_jwt` entries added).
 
 ---
 
-## 0. Environment Classification (binding)
+### Item 1 — Chat stability
 
-- This Remix is permanently classified as **development**.
-- `APP_ENV` (Edge Function secret) and `VITE_APP_ENV` (client build) are fixed to the exact literal `development`.
-- Shared helpers `assertDevEnvironment()` (Edge) and `useIsDevEnvironment()` (client) treat any other value — missing, empty, differently-cased, or anything else — as invalid and fail closed:
-  - Edge Functions return `503 environment_misconfigured`.
-  - Client renders a full-screen block screen instead of the app.
-- Rollback never instructs anyone to set either variable to `production` or to unset them.
+Two Live fixes from 24 July, both absent here.
 
-## 1. Global Development Banner
+**Database (2 migrations, in order, ported from Live `20260724125525` and `20260724125948`)**
+- `mark_chat_room_read(p_room_id uuid) returns integer`
+- `get_chat_unread_counts() returns table(room_id uuid, unread_count bigint)`
+- Indexes on `chat_messages (room_id, sender_id, id)` and `chat_message_reads (user_id, message_id)`
+- `REVOKE EXECUTE … FROM PUBLIC, anon`; `GRANT EXECUTE … TO authenticated` on both
 
-- `DevEnvironmentBanner` at the top of `AppShell` and above `/auth`; visible on every route.
-- Full-width `bg-destructive`, white text, fixed top, `z-[100]`, `role="status"`, ~28px. Text: `DEVELOPMENT ENVIRONMENT — NOT PRODUCTION · Outbound email, webhooks and third-party calls are blocked`.
-- Renders only when `VITE_APP_ENV === 'development'`; any other value triggers the §0 block screen.
-- Adjust topbar/main padding for banner height.
-- Hook injects `[DEV] ` prefix into `document.title` on every route.
+**Code**
+- `src/components/chat/MessagesList.tsx` — remove the per-message read-receipt `IntersectionObserver` and its batch-flush machinery (lines 30-34, 57-124, plus the `data-message-id`/`data-sender-id` refs it feeds). Keep the separate bottom-sentinel observer, `useMessageReactions`, and auto-scroll exactly as they are.
+- `src/hooks/useChatUnread.ts` — replace the membership → messages → read-receipts three-query calculation with one `get_chat_unread_counts()` call. Keep the realtime channel, the UUID channel-name strategy, the optimistic increment and the notification ping.
+- `src/hooks/useChat.ts` — `markAsRead` calls `mark_chat_room_read` with request de-duplication; `sendMessage` returns an explicit boolean; its catch block detects auth-class failures (`PGRST301`, jwt/auth/permission/RLS) and shows "Session expired".
+- `src/components/chat/ChatPanel.tsx` — stop firing read receipts on every message change.
+- `src/components/chat/MessageComposer.tsx` and `src/pages/Chat.tsx` — clear the input only after the send resolves true, so failed sends keep the user's text.
+- `src/context/AuthContext.tsx` — **section merge only.** Add `isRefreshTokenFailure()` (matches `refresh_token_not_found` / `refresh_token_already_used`) and `forceReauth()` (deep-clean every `sb-*-auth-token` key from `localStorage` and `sessionStorage`, sign out, redirect to `/auth`), wired into session bootstrap and the unhandled-rejection path. Development's `withTimeout` bootstrap, `clearProjectAuthStorage`, status reconciliation and offline-on-signout logic all stay.
 
-## 2. Development-Only Email Safety
+**Redirect-conflict check (mandatory).** `forceReauth()` targets `/auth`; `src/lib/suspensionSession.ts` independently signs out toward `/account-suspended`. Trace both, confirm a suspended user still reaches `/account-suspended`, a dead-token user reaches `/auth`, and neither re-enters the other. If they can race, gate `forceReauth()` behind a check for an in-flight suspension redirect.
 
-Central guard; fail closed.
+### Item 2 — Customer directory RPC
 
-- `supabase/functions/_shared/email-guard.ts` exports `assertEmailAllowed(candidateRecipients)` and `isDevEnvironment()`.
-- Requires `APP_ENV === 'development'`.
-- `DEV_EMAIL_ALLOWLIST` is a comma-separated list of **exact email addresses only**. Domain-only entries are rejected at parse time and treated as empty.
-- Normalise (trim + lowercase) and compare for exact equality.
-- Checked surfaces: `to`, `cc`, `bcc`, `reply_to`, and SMTP envelope recipient(s). Any address not on the allowlist blocks the entire send. No silent stripping. No redirection to an allowed inbox.
-- Empty / missing / invalid allowlist ⇒ every send blocked.
-- Overlay block-list: any address matching `kenneth@thevateam.co.uk` or ending in `@thevateam.co.uk` is refused even if allowlisted.
-- Wired into: `send-transactional-email`, `auth-email-hook`, `process-email-queue`, `process-invoice-reminders`, `inbound-email` (reply path), `parse-lead-email`, `retry-inbound-emails`, `reassign-kate-requests`, `handle-email-suppression`, `handle-email-unsubscribe`.
-- `send-transactional-email` adds `[DEV] ` subject prefix and a "Sent from development environment" footer when the guard permits a send.
-- Remove hard-coded `kenneth@thevateam.co.uk` and `@thevateam.co.uk` recipients; replace with `DEV_NOTIFICATIONS_TO` (itself validated through the allowlist).
+- Port Live `20260730065423` then `20260730070557`: the second drops the interim `customer_directory` view and creates `get_customer_directory()` — `SECURITY DEFINER`, `search_path = public`, requires `auth.uid()`, returns `id, name, status, account_id` only, EXECUTE revoked from `anon`/`PUBLIC` and granted to `authenticated`/`service_role`.
+- Switch six call sites to `supabase.rpc("get_customer_directory")`: `ChecklistTemplateBuilder.tsx`, `EmailIntakeRules.tsx`, `EmailRoutingAuditLog.tsx`, `DailyChecklist.tsx`, `TasksContext.tsx`, `useGlobalLiveAlerts.ts`. Client-side sort where the old query relied on `.order()`; `.find()` where it relied on `.maybeSingle()`.
+- Development's RLS is untouched. Live's `20260724143615` (customers SELECT) is **not applied** — Development's `customers_select_scoped` stays authoritative.
 
-## 3. Replace Production URLs In Development Emails
+### Item 3 — Recurring invoice extra line items
 
-- `APP_PUBLIC_URL` set explicitly to the confirmed Remix preview origin (`https://id-preview--8b31b9e2-c03e-432c-8f58-7a093ded151c.lovable.app`).
-- Must be present, a valid `https://` URL, and match an internal approved-origins list. Any failure ⇒ `503 environment_misconfigured`. No localhost fallback in the deployed Remix.
-- Sweep `_shared/email-templates/**`, `_shared/transactional-email-templates/**`, and functions `create-proposal-token`, `submit-proposal`, `get-proposal`, `submit-form`, `get-form`, `handle-email-unsubscribe`, `inbound-email` for `portal.thevateam.co.uk`, `thevateam.co.uk`, and prod Supabase URLs; replace with `APP_PUBLIC_URL`.
-- Repo-local check script greps for prod hostnames and fails on operational references.
+- Port Live `20260730064333`: `extra_line_items jsonb` on `recurring_invoice_schedules`, plus the updated `generate_due_recurring_invoices` that includes them in totals. Additive column with a default — no breaking change.
+- Add `src/components/crm/InvoiceLineItemsEditor.tsx` (new file, exports the editor plus `extraLineTotal`).
+- Merge its use into `RecurringInvoiceSchedules.tsx` and `ProposalInvoicesTab.tsx`. Invoice generation logic is otherwise unchanged.
 
-## 4. Authentication Safety and Identity Reconciliation
+### Item 4 — Invoice PDF download fix
 
-- Reconciliation: v1.0's reference to `kenneth@thevateam.co.uk` as an existing bootstrap account is inconsistent with the earlier audit's `auth.users` count of zero. Phase 0.5 does not depend on that account.
-  - Read-only verification against `auth.users` for that address before sign-off. If present, remove via a confirmed deletion path (§10 amendment 9); never recreate.
-  - No production email identity is created, reused, or left present in this Remix.
-- Supabase auth for this Remix permits only:
-  - The confirmed Remix preview origin from §3
-  - `http://localhost:8080`
-- Remove any `portal.thevateam.co.uk` (or other production URL) from the Remix's Site URL and Redirect URLs. Production Supabase project is not touched.
-- `auth-email-hook` runs through §2 guard.
-- Auth templates rebranded: `[DEV Operations Workspace]` subject prefix, "Development environment" header badge, disclaimer body copy, `siteName` = `Operations Workspace (DEV)`.
+**Pre-implementation verification (done).** Development stores the **full URL**, not the object path: `src/lib/invoicePdf.ts:216` returns `getPublicUrl(path).publicUrl`, and `ProposalInvoicesTab.tsx:275` persists that string into `proposal_invoices.pdf_url`. `invoice-pdfs` is private, so those URLs 404. `proposal_invoices` currently holds 0 rows, so there is no legacy data to migrate.
 
-## 5. Outbound Edge Function Review
+Conclusion: keep the existing URL-in-column data model and adopt the Live behaviour. **No schema change, no column rename, no data migration, no path/URL redesign in this sprint.**
 
-"Guarded" = keep code, wrap with `assertDevEnvironment()` + specific guard. "Disabled" = early-return `503 disabled_in_dev`. "Unchanged" = no external side effects. AI-capable functions are Disabled for Phase 0.5 regardless of `LOVABLE_API_KEY` presence (v1.1 amendment 2).
+- `src/lib/invoicePdf.ts` — after upload, return a long-lived signed URL from `createSignedUrl(path, ttl, { download: \`${invoiceNumber}.pdf\` })` instead of `getPublicUrl`. Same return type (`Promise<string>`), same call sites, same column. Bucket stays private; no storage policy change.
+- `supabase/functions/process-invoice-reminders/index.ts` — before emailing, derive the object path from the stored `pdf_url` (split on `/invoice-pdfs/`, strip the query string, URL-decode) and re-sign it. This makes reminder links fresh and keeps any URL shape — old public-style or new signed — working, so nothing breaks if rows appear before deploy. Deploy the function afterwards.
+- Check the resend path in `ProposalInvoicesTab.tsx`; re-sign there too if it reuses a stored URL rather than regenerating the PDF.
+- Finish with a repo-wide check that no invoice flow calls `getPublicUrl` on `invoice-pdfs`. Other buckets (`form-images`, `noticeboard-images`) are out of scope.
 
-| Function | Capability | Phase 0.5 disposition |
-|---|---|---|
-| `send-transactional-email` | Email | Guarded |
-| `auth-email-hook` | Email | Guarded |
-| `process-email-queue` | Email HTTP send | Guarded (final pre-send check) |
-| `handle-email-suppression` | Inbound webhook | Guarded (ingress accepted; outbound blocked) |
-| `handle-email-unsubscribe` | Email link handler | Unchanged (local DB; uses `APP_PUBLIC_URL`) |
-| `preview-transactional-email` | Renders only | Unchanged |
-| `process-invoice-reminders` | Email + schedule | **Disabled** |
-| `inbound-email` | Inbound webhook + email reply | Guarded (ingress accepted; outbound blocked) |
-| `retry-inbound-emails` | Email | **Disabled** |
-| `parse-lead-email` | Email + AI | **Disabled** |
-| `reassign-kate-requests` | Email | **Disabled** |
-| `poll-gmail-dictations` | Google API | **Disabled** |
-| `generate-script-ai` | AI | **Disabled** |
-| `get-google-maps-key` | Google Maps key vend | Guarded (503 when key unset; keep) |
-| `github-status` | GitHub API | **Disabled** |
-| `create-proposal-token` | Public link generation | Guarded (see Public Endpoint Guard below) |
-| `get-proposal` / `submit-proposal` | Public-facing | Guarded (no outbound notification in dev) |
-| `get-form` / `submit-form` | Public form endpoints | Guarded (no outbound notification in dev) |
-| `encrypt-financial-data` | Local crypto | Unchanged |
-| `admin-create-user` | Auth admin | Unchanged (Super-Admin gated); unused in Phase 0.5 |
+Noted for a later sprint, not now: storing the object path and signing purely on demand is the cleaner model, but that is a data-model change and is deliberately excluded from Sprint 1.
 
-### Public Endpoint Guard (revised in v1.2 — feature-flag controlled)
+### Item 5 — Unified invoice reporting
 
-The `x-dev-test-token` guard on public endpoints (`get-form`, `submit-form`, `get-proposal`, `submit-proposal`, `create-proposal-token`) is now controlled by a development feature flag rather than being permanently hard-coded.
+- Port Live `20260730065946` (the `invoices_unified` view and `get_invoice_report`), with the hardening from `20260730070557` (view set to `security_invoker = on`, direct SELECT revoked from `anon`/`authenticated`, access only through the `has_billing_access()`-gated RPC).
+- Add `src/hooks/useInvoiceReport.ts`, `src/components/reports/InvoiceTotalsStrip.tsx`, `src/components/reports/CombinedInvoicesReport.tsx`.
+- Mount them exactly as Live does: totals strip in `BillingDashboard.tsx`, `CRMDashboard.tsx` and `ProposalInvoicesTab.tsx`; an `all-invoices` tab rendering `CombinedInvoicesReport` in `CallBilling.tsx`. Existing Development reporting (`UnifiedBillingReports`, `MonthlyCallBillingReport`, `Reports.tsx`) is left alone.
 
-- **Flag**: `DEV_PUBLIC_ENDPOINT_GUARD` — Edge Function secret. Accepted exact values: `enabled`, `disabled`. Default when unset: `enabled` (fail-safe default).
-- **When `enabled`** (default):
-  - Each listed endpoint requires request header `x-dev-test-token` equal to `DEV_PUBLIC_ENDPOINT_TOKEN`.
-  - Missing/mismatched token ⇒ `403 dev_token_required`.
-  - `DEV_PUBLIC_ENDPOINT_TOKEN` unset ⇒ `503 environment_misconfigured` (fail closed rather than opening up).
-- **When `disabled`**:
-  - The token header check is skipped.
-  - All other Phase 0.5 protections remain in force: `APP_ENV`/`VITE_APP_ENV` gating, the §2 email guard (so no outbound notification), `APP_PUBLIC_URL` origin check for generated links, and the disabled/guarded classifications above.
-  - Disabling this flag does **not** re-enable AI, does **not** widen the email allowlist, and does **not** allow production URLs.
-- **Any other value** (including empty string, mixed case, unknown token) ⇒ treated as invalid and fails closed with `503 environment_misconfigured`, matching the strict-value pattern used elsewhere in this plan.
-- Flag state is logged (name + value only, no secrets) at function cold start so its effective setting is auditable.
-- The flag lives alongside other Phase 0.5 secrets (§6) and can be toggled without a code change; flipping it does not require redeploy of the Edge Functions if only the secret value changes.
+### Item 6 — Security hotfixes
 
-## 6. Environment Variables
+- Port Live `20260724101031` only: `inbound_email_log` SELECT via `is_admin_or_higher()` with explicit deny on INSERT/UPDATE/DELETE for authenticated (writes stay service-role), and four admin-only `storage.objects` policies scoped to `database_export_22_07_26`.
+- Check Development's `20260724075510` first and skip anything it already covers.
+- No other RLS tightening. Customer, account and form security untouched.
 
-Fixed (must equal `development`):
+---
 
-- `APP_ENV`
-- `VITE_APP_ENV`
+### Migration safety rule for the whole sprint
 
-Required for Phase 0.5:
+Every migration in Sprint 1 is additive: new functions, new indexes, new policies, one new nullable JSONB column with a default, one new view. No column drops, no renames, no type changes, no destructive data statements.
 
-- `APP_PUBLIC_URL` — confirmed Remix preview origin
-- `LOVABLE_API_KEY` — present because platform-managed; presence does not grant permission to call AI in Phase 0.5
+### Order of work
 
-Required when `DEV_PUBLIC_ENDPOINT_GUARD` is `enabled` (the default):
+```text
+1  Migrations: chat (x2) → security → recurring items → reporting/directory (2 of 30 Jul, in order)
+2  Let types.ts regenerate — never hand-edited, never copied from Live
+3  New files: InvoiceLineItemsEditor, useInvoiceReport, InvoiceTotalsStrip, CombinedInvoicesReport
+4  Chat code (AuthContext last, after the redirect-conflict trace)
+5  Directory RPC call sites (6)
+6  Invoice PDF signing + deploy process-invoice-reminders
+7  Reporting mount points (4)
+8  Typecheck, then behavioural verification
+```
 
-- `DEV_PUBLIC_ENDPOINT_TOKEN` — random string used by the public endpoint guard
+### Verification
 
-Optional (feature-flag / opt-in):
+Chat: message sends persist; no per-message write burst in the network panel; unread counts correct; failed send keeps the text; dead-token redirect to `/auth`; suspended user still reaches `/account-suspended`; no loop.
+Customers: names render on checklist, email-intake, routing audit, daily checklist, tasks and live alerts; no direct `customers` reads remain on those paths.
+Invoices: recurring generation correct; extra line items total correctly; a generated invoice PDF downloads from the private bucket; a reminder run produces a working signed link.
+Reporting: report loads; CRM and billing totals agree with existing data.
+Security: `inbound_email_log` and export-bucket permissions behave as intended.
 
-- `DEV_PUBLIC_ENDPOINT_GUARD` — `enabled` (default) or `disabled`; anything else = fail closed
-- `DEV_EMAIL_ALLOWLIST` — comma-separated exact addresses only
-- `DEV_NOTIFICATIONS_TO` — single exact address; must also appear in the allowlist
+### Preserved, explicitly
 
-Production-only — must remain UNSET in this Remix:
+Phase 0.5 hardening, environment/email/public-endpoint guards, Development banner, watchdog, error boundary, storage guard, timeout utilities, Edge Function neutralisation, Phase 1B Stage 2 permission work, admin privilege ceiling, the suspension system, and every Development migration from `20260723064303` to `20260728122123`.
 
-- `INBOUND_EMAIL_SECRET`
-- `POLL_GMAIL_CRON_SECRET`
-- `GOOGLE_MAPS_API_KEY` (unless a dev-only key is separately approved)
-- Any Gmail OAuth tokens / Google service credentials
-- Any GitHub API token
-- Any Xero credentials
-- Any Stripe / payment provider secret
-- Any production webhook signing secret
+### Not implemented
 
-Verification: `fetch_secrets` after hardening shows only the fixed, required, and explicitly approved optional entries. Anything else blocks Phase 0.5 sign-off.
-
-## 7. Development Test Accounts (design only)
-
-Per v1.1 amendment 3, no accounts are created in Phase 0.5. Design constraints for later phases:
-
-- UI/state-only identities use non-deliverable local addresses (e.g. `test-a@invalid.localhost`). No `.dev.local` (v1.1 amendment 6). No `@thevateam.co.uk`. No real customer addresses.
-- Authentication-email testing uses a separately approved controlled inbox or sandbox address that has been explicitly added to `DEV_EMAIL_ALLOWLIST`.
-- Role assignment deferred until Phase 1 confirms authoritative role values.
-
-## 8. Development Seed Dataset (design only)
-
-Per v1.1 amendment 7, no seed data inserted in Phase 0.5. Design:
-
-- No schema changes; no assumption of a `source` column.
-- Local seed manifest (JSON) outside the DB: table name, PK values, timestamp, Remix project ref captured at insert time.
-- Insertion (deferred): script writes rows and appends to the manifest.
-- Cleanup (deferred): verifies current project ref matches manifest ref, then deletes strictly by PK. No `TRUNCATE`, no broad predicate deletes.
-- Content design: 3 dev customers, obviously fake addresses, `test-N@invalid.localhost` contacts, no NI numbers, no bank details, encrypted fields null.
-
-## 9. Verification Checklist
-
-1. `VITE_APP_ENV=development` ⇒ banner visible on `/auth`, `/`, deep route. Any other value ⇒ block screen.
-2. `APP_ENV=development` ⇒ Edge Functions accept invocations. Any other value ⇒ every guarded function returns `503 environment_misconfigured`.
-3. `fetch_secrets` matches §6.
-4. Empty `DEV_EMAIL_ALLOWLIST` ⇒ every attempted send blocked with `email_blocked_dev_environment`.
-5. Single exact address in the allowlist ⇒ only that address deliverable; domain-only entries rejected at parse time.
-6. Any `@thevateam.co.uk` recipient ⇒ blocked even if allowlisted.
-7. `process-invoice-reminders`, `retry-inbound-emails`, `reassign-kate-requests`, `poll-gmail-dictations`, `github-status`, `generate-script-ai`, `parse-lead-email` each return `503 disabled_in_dev`.
-8. Grep for `portal.thevateam.co.uk`, `@thevateam.co.uk`, prod Supabase URLs. Per v1.1 amendment 12, distinguish operational references (must be zero) from branding assets (allowed only if separately identified and justified; preferred action: copy the asset into this Remix and reference the dev-safe copy).
-9. Auth email preview shows `[DEV]` prefix and disclaimer; `siteName` reads `Operations Workspace (DEV)`.
-10. Supabase auth Site URL and Redirect URLs contain only the Remix preview origin and `http://localhost:8080`.
-11. `auth.users` contains no `@thevateam.co.uk` identity; if one existed at Phase 0.5 start it has been removed via a confirmed deletion path.
-12. Public endpoint guard behaviour:
-    - `DEV_PUBLIC_ENDPOINT_GUARD` unset (default `enabled`): requests to public endpoints without `x-dev-test-token` ⇒ `403 dev_token_required`; with correct token ⇒ works; `DEV_PUBLIC_ENDPOINT_TOKEN` unset ⇒ `503 environment_misconfigured`.
-    - `DEV_PUBLIC_ENDPOINT_GUARD=disabled`: requests without the header succeed, but any resulting email is still blocked by §2 and any generated link still uses `APP_PUBLIC_URL`.
-    - `DEV_PUBLIC_ENDPOINT_GUARD` set to any other value ⇒ `503 environment_misconfigured`.
-    - Cold-start log line records the effective flag value.
-13. `APP_PUBLIC_URL` unset or not on the approved-origins list ⇒ any function that builds an external link returns `503 environment_misconfigured`.
-
-## 10. Rollback Procedure
-
-Rollback never sets `APP_ENV` or `VITE_APP_ENV` to `production` and never unsets them.
-
-1. **Feature-level rollback**: revert individual commits (banner, guards, disable blocks). `APP_ENV`/`VITE_APP_ENV` stay `development`.
-2. **Public endpoint guard**:
-   - To temporarily bypass the token check without a code change, set `DEV_PUBLIC_ENDPOINT_GUARD=disabled`.
-   - To re-enable, set it to `enabled` or unset it (default is `enabled`).
-   - To disable the endpoints entirely, unset `DEV_PUBLIC_ENDPOINT_TOKEN` while the guard is `enabled` ⇒ endpoints fail closed with `503 environment_misconfigured`.
-3. **Email allowlist rollback**: clear `DEV_EMAIL_ALLOWLIST` ⇒ sends blocked. Or revert the guard commit.
-4. **Test account cleanup**: Phase 0.5 creates no accounts. Any later cleanup uses only deletion methods confirmed to exist in this Remix at that time; `admin-create-user` is not documented as a deletion path here (v1.1 amendment 9).
-5. **Seed data cleanup**: Phase 0.5 inserts no seed rows. Any later cleanup uses the manifest-driven, project-ref-verified delete described in §8. No broad truncation.
-6. **Auth redirect rollback**: reapply the prior redirect URL list from source control via `supabase--configure_auth`. Production Supabase project is never modified.
-
-No migrations, RLS, tables, or permissions are touched by this phase; rollback is limited to code and Edge Function secrets in this Remix.
+Customer Accounts, Contracts, Workflow Automation, CRM redesign, `CustomerDetailsForm` / `CustomersContext` refactoring, React Query, package-proposal redesign, performance work, general cleanup, Live migration `20260724143615`, any `config.toml` change, and any change to how invoice PDF locations are stored.
