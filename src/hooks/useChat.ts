@@ -74,6 +74,8 @@ export const useChat = () => {
   const roomsRef = useRef<ChatRoom[]>([]);
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const messagesMapRef = useRef<Record<string, ChatMessage[]>>({});
+  const markReadInFlightRef = useRef<Set<string>>(new Set());
+  const lastMarkReadAtRef = useRef<Record<string, number>>({});
   useEffect(() => { roomsRef.current = rooms; }, [rooms]);
   useEffect(() => { activeRoomRef.current = activeRoom; }, [activeRoom]);
   useEffect(() => { messagesMapRef.current = messagesMap; }, [messagesMap]);
