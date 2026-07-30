@@ -444,26 +444,20 @@ export const useChat = () => {
   const markAsRead = useCallback(async (roomId: string) => {
     if (!user || !roomId) return;
 
-    try {
-      // Mark all unread messages in this room as read
-      const { data: unreadMessages } = await supabase
-        .from('chat_messages')
-        .select('id')
-        .eq('room_id', roomId)
-        .neq('sender_id', user.id);
+    const now = Date.now();
+    if (markReadInFlightRef.current.has(roomId)) return;
+    if (now - (lastMarkReadAtRef.current[roomId] ?? 0) < 1500) return;
 
-      if (unreadMessages && unreadMessages.length > 0) {
-        const reads = unreadMessages.map(msg => ({
-          message_id: msg.id,
-          user_id: user.id,
-        }));
-        const { error } = await (supabase
-          .from('chat_message_reads') as any)
-          .upsert(reads, { onConflict: 'message_id,user_id', ignoreDuplicates: true });
-        if (error) throw error;
-      }
+    markReadInFlightRef.current.add(roomId);
+    lastMarkReadAtRef.current[roomId] = now;
+
+    try {
+      const { error } = await supabase.rpc('mark_chat_room_read' as any, { p_room_id: roomId });
+      if (error) throw error;
     } catch (err) {
       console.error('Error marking as read:', err);
+    } finally {
+      markReadInFlightRef.current.delete(roomId);
     }
   }, [user]);
 
