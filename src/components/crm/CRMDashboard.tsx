@@ -5,6 +5,15 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useCustomers, type Customer } from "@/context/CustomersContext";
 import { formatGBP } from "@/lib/currency";
+import { InvoiceTotalsStrip } from "@/components/reports/InvoiceTotalsStrip";
+
+/** ISO date 12 months back, used for the combined invoice strip. */
+function twelveMonthsAgoIso(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 12);
+  return d.toISOString().slice(0, 10);
+}
+
 import {
   Target, Users, TrendingUp, TrendingDown, PoundSterling,
   RefreshCw, BarChart3, PieChart, CalendarClock, ArrowUpRight, ArrowDownRight, Minus
@@ -147,6 +156,9 @@ export function CRMDashboard() {
           Refresh Data
         </Button>
       </div>
+
+      {/* ═══ INVOICED REVENUE (CRM + BILLING) ═══ */}
+      <InvoiceTotalsStrip periodLabel="Last 12 months" from={twelveMonthsAgoIso()} />
 
       {/* ═══ A. SALES PERFORMANCE ═══ */}
       <div>

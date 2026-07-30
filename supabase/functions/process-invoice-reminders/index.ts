@@ -114,6 +114,21 @@ Deno.serve(async (req) => {
     }
 
     const cfg = REMINDER_MAP[key]
+
+    // invoice-pdfs is a private bucket: re-sign the stored path so the link works
+    let pdfLink: string | undefined = inv.pdf_url || undefined
+    if (inv.pdf_url) {
+      const marker = '/invoice-pdfs/'
+      const idx = inv.pdf_url.indexOf(marker)
+      if (idx !== -1) {
+        const objectPath = inv.pdf_url.slice(idx + marker.length).split('?')[0]
+        const { data: signed } = await supabase.storage
+          .from('invoice-pdfs')
+          .createSignedUrl(decodeURIComponent(objectPath), 60 * 60 * 24 * 30)
+        if (signed?.signedUrl) pdfLink = signed.signedUrl
+      }
+    }
+
     const { error: sendErr } = await supabase.functions.invoke('send-transactional-email', {
       body: {
         templateName: 'invoice-reminder',
@@ -126,7 +141,7 @@ Deno.serve(async (req) => {
           total: Number(inv.total),
           issuedAt: inv.issued_at,
           dueAt: inv.due_at,
-          pdfUrl: inv.pdf_url || undefined,
+          pdfUrl: pdfLink,
           reminderType: cfg.type,
           daysOverdue: diffDays,
         },

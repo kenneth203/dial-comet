@@ -274,11 +274,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
       let customerName = '';
       if (task?.customerId) {
-        const { data: customerData } = await supabase
-          .from('customers')
-          .select('name')
-          .eq('id', task.customerId)
-          .maybeSingle();
+        const { data: directory } = await (supabase.rpc('get_customer_directory' as any) as any);
+        const customerData = ((directory ?? []) as any[]).find((c) => c.id === task.customerId);
         if (customerData?.name) customerName = customerData.name;
       }
 

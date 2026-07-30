@@ -15,6 +15,7 @@ import { Repeat, Plus, Pencil, Trash2, Play, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { usePackages } from "@/context/PackagesContext";
 import { formatGBP } from "@/lib/currency";
+import { InvoiceLineItemsEditor, extraLineTotal, type ExtraLineItem } from "./InvoiceLineItemsEditor";
 
 type Schedule = {
   id: string;
@@ -36,6 +37,7 @@ type Schedule = {
   weekend_cover_fee: number;
   additional_lines: boolean;
   additional_lines_fee: number;
+  extra_line_items: ExtraLineItem[] | null;
 };
 
 type Customer = { id: string; name: string; email: string | null; contact: string | null; address: string | null };
@@ -62,6 +64,7 @@ const emptyForm = (): FormState => ({
   weekend_cover_fee: 99,
   additional_lines: false,
   additional_lines_fee: 49,
+  extra_line_items: [],
 });
 
 export function RecurringInvoiceSchedules({ onInvoicesGenerated }: { onInvoicesGenerated?: () => void }) {
@@ -111,6 +114,13 @@ export function RecurringInvoiceSchedules({ onInvoicesGenerated }: { onInvoicesG
       weekend_cover_fee: Number(s.weekend_cover_fee) || 0,
       additional_lines: !!s.additional_lines,
       additional_lines_fee: Number(s.additional_lines_fee) || 0,
+      extra_line_items: Array.isArray(s.extra_line_items)
+        ? s.extra_line_items.map(li => ({
+            description: li.description,
+            quantity: Number(li.quantity) || 1,
+            unit_price: Number(li.unit_price) || 0,
+          }))
+        : [],
     });
     setOpen(true);
   };
@@ -129,6 +139,10 @@ export function RecurringInvoiceSchedules({ onInvoicesGenerated }: { onInvoicesG
   const submit = async () => {
     if (!form.customer_id) return toast({ title: "Customer required", variant: "destructive" });
     if (!form.package_name.trim()) return toast({ title: "Package required", variant: "destructive" });
+    const extras = (form.extra_line_items || []).filter(li => li.description.trim());
+    if ((form.extra_line_items || []).length !== extras.length) {
+      return toast({ title: "Additional lines need a description", variant: "destructive" });
+    }
     setSaving(true);
     const payload = {
       ...form,
@@ -144,6 +158,11 @@ export function RecurringInvoiceSchedules({ onInvoicesGenerated }: { onInvoicesG
       weekend_cover_fee: form.weekend_cover ? Number(form.weekend_cover_fee) || 0 : 0,
       additional_lines: !!form.additional_lines,
       additional_lines_fee: form.additional_lines ? Number(form.additional_lines_fee) || 0 : 0,
+      extra_line_items: extras.map(li => ({
+        description: li.description,
+        quantity: Number(li.quantity) || 1,
+        unit_price: Number(li.unit_price) || 0,
+      })),
     };
     let error;
     if (editingId) {
@@ -223,7 +242,9 @@ export function RecurringInvoiceSchedules({ onInvoicesGenerated }: { onInvoicesG
                 const cust = customers.find(c => c.id === s.customer_id);
                 const weekendFee = s.weekend_cover ? Number(s.weekend_cover_fee) || 0 : 0;
                 const addlFee = s.additional_lines ? Number(s.additional_lines_fee) || 0 : 0;
-                const subtotal = Number(s.package_price) + weekendFee + addlFee;
+                const scheduleExtras = Array.isArray(s.extra_line_items) ? s.extra_line_items : [];
+                const extrasTotal = extraLineTotal(scheduleExtras as ExtraLineItem[]);
+                const subtotal = Number(s.package_price) + weekendFee + addlFee + extrasTotal;
                 const total = subtotal * (1 + Number(s.vat_rate));
                 return (
                   <TableRow key={s.id}>
@@ -231,10 +252,11 @@ export function RecurringInvoiceSchedules({ onInvoicesGenerated }: { onInvoicesG
                     <TableCell><Badge variant="outline">{s.service_type}</Badge></TableCell>
                     <TableCell>
                       <div>{s.package_name}</div>
-                      {(s.weekend_cover || s.additional_lines) && (
-                        <div className="flex gap-1 mt-1">
+                      {(s.weekend_cover || s.additional_lines || scheduleExtras.length > 0) && (
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {s.weekend_cover && <Badge variant="secondary" className="text-xs">Weekend</Badge>}
                           {s.additional_lines && <Badge variant="secondary" className="text-xs">+Lines</Badge>}
+                          {scheduleExtras.length > 0 && <Badge variant="secondary" className="text-xs">+{scheduleExtras.length} extra</Badge>}
                         </div>
                       )}
                     </TableCell>
@@ -362,9 +384,36 @@ export function RecurringInvoiceSchedules({ onInvoicesGenerated }: { onInvoicesG
               <Textarea rows={2} value={form.client_address || ""} onChange={(e) => setForm(f => ({ ...f, client_address: e.target.value }))} />
             </div>
             <div className="col-span-2">
+              <InvoiceLineItemsEditor
+                items={(form.extra_line_items as ExtraLineItem[]) || []}
+                onChange={(items) => setForm(f => ({ ...f, extra_line_items: items }))}
+                title="Extra Lines (added to every generated invoice)"
+                description="Recurring extras such as extra hours, postage or expenses."
+              />
+            </div>
+            <div className="col-span-2">
               <Label>Notes</Label>
               <Textarea rows={2} value={form.notes || ""} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
+            {(() => {
+              const pkg = Number(form.package_price) || 0;
+              const weekend = form.weekend_cover ? Number(form.weekend_cover_fee) || 0 : 0;
+              const addl = form.additional_lines ? Number(form.additional_lines_fee) || 0 : 0;
+              const extrasSum = extraLineTotal((form.extra_line_items as ExtraLineItem[]) || []);
+              const sub = pkg + weekend + addl + extrasSum;
+              const rate = Number(form.vat_rate) || 0;
+              return (
+                <div className="col-span-2 bg-muted/40 rounded-md p-3 text-sm">
+                  <div className="flex justify-between"><span>Package</span><span>{formatGBP(pkg)}</span></div>
+                  {weekend > 0 && <div className="flex justify-between"><span>Weekend cover</span><span>{formatGBP(weekend)}</span></div>}
+                  {addl > 0 && <div className="flex justify-between"><span>Additional lines</span><span>{formatGBP(addl)}</span></div>}
+                  {extrasSum > 0 && <div className="flex justify-between"><span>Extra lines</span><span>{formatGBP(extrasSum)}</span></div>}
+                  <div className="flex justify-between"><span>Subtotal</span><span>{formatGBP(sub)}</span></div>
+                  <div className="flex justify-between"><span>VAT</span><span>{formatGBP(sub * rate)}</span></div>
+                  <div className="flex justify-between font-semibold"><span>Total per invoice</span><span>{formatGBP(sub * (1 + rate))}</span></div>
+                </div>
+              );
+            })()}
             <div className="col-span-2 flex items-center gap-2">
               <Switch checked={form.active} onCheckedChange={(v) => setForm(f => ({ ...f, active: v }))} />
               <Label>Active</Label>

@@ -126,8 +126,8 @@ export default function ChecklistTemplateBuilder() {
       }
     })();
     (async () => {
-      const { data } = await supabase.from("customers").select("id,name").order("name");
-      setCustomers((data ?? []) as any);
+      const { data } = await (supabase.rpc("get_customer_directory" as any) as any);
+      setCustomers((((data ?? []) as any[]).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)))) as any);
     })();
   }, []);
 

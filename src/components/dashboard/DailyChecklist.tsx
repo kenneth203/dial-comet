@@ -729,11 +729,12 @@ export default function DailyChecklist({ hideTabs = false, hideClosed = false }:
     setCustomerNames((prev) => {
       const missing = ids.filter((id) => !(id in prev));
       if (missing.length === 0) return prev;
-      supabase.from("customers").select("id,name").in("id", missing).then(({ data: custs }) => {
+      (supabase.rpc("get_customer_directory" as any) as any).then(({ data: custs }: any) => {
         if (custs) {
+          const wanted = new Set(missing);
           setCustomerNames((p) => {
             const next = { ...p };
-            (custs as any[]).forEach((c) => { next[c.id] = c.name; });
+            (custs as any[]).forEach((c) => { if (wanted.has(c.id)) next[c.id] = c.name; });
             return next;
           });
         }
