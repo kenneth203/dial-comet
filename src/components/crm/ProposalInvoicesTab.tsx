@@ -19,7 +19,16 @@ import { buildInvoicePdf, uploadInvoicePdf, downloadInvoicePdfBlob, type Invoice
 import { format } from "date-fns";
 import { usePackages } from "@/context/PackagesContext";
 import { RecurringInvoiceSchedules } from "./RecurringInvoiceSchedules";
+import { InvoiceLineItemsEditor, extraLineTotal, type ExtraLineItem } from "./InvoiceLineItemsEditor";
 import { formatGBP } from "@/lib/currency";
+import { InvoiceTotalsStrip } from "@/components/reports/InvoiceTotalsStrip";
+
+/** ISO date 12 months back, used for the business-wide invoicing strip. */
+function twelveMonthsAgoIso(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 12);
+  return d.toISOString().slice(0, 10);
+}
 
 type Invoice = {
   id: string;
@@ -64,6 +73,7 @@ type FormState = {
   client_address: string;
   notes: string;
   status: string;
+  extra_items: ExtraLineItem[];
 };
 
 const emptyForm = (): FormState => ({
@@ -79,6 +89,7 @@ const emptyForm = (): FormState => ({
   client_address: "",
   notes: "",
   status: "pending",
+  extra_items: [],
 });
 
 export function ProposalInvoicesTab() {
@@ -146,6 +157,18 @@ export function ProposalInvoicesTab() {
 
   const openEdit = (inv: Invoice) => {
     setEditingId(inv.id);
+    const packageDescs = [
+      `${inv.package_name}${inv.service_type ? ` (${inv.service_type})` : ""}`.toLowerCase(),
+      `${inv.service_type} — ${inv.package_name}`.toLowerCase(),
+      inv.package_name.toLowerCase(),
+    ];
+    const extras: ExtraLineItem[] = (inv.line_items || [])
+      .filter(li => !packageDescs.includes((li.description || "").trim().toLowerCase()))
+      .map(li => ({
+        description: li.description,
+        quantity: Number(li.quantity) || 1,
+        unit_price: Number(li.unit_price) || 0,
+      }));
     setForm({
       customer_id: inv.customer_id,
       invoice_number: inv.invoice_number,
@@ -159,6 +182,7 @@ export function ProposalInvoicesTab() {
       client_address: inv.client_address || "",
       notes: inv.notes || "",
       status: inv.status,
+      extra_items: extras,
     });
     setFormOpen(true);
   };
@@ -177,18 +201,39 @@ export function ProposalInvoicesTab() {
   const submitForm = async () => {
     if (!form.customer_id) return toast({ title: "Customer is required", variant: "destructive" });
     if (!form.package_name.trim()) return toast({ title: "Package name is required", variant: "destructive" });
+    const cleanExtras = form.extra_items.filter(li => li.description.trim());
+    if (form.extra_items.length !== cleanExtras.length) {
+      return toast({ title: "Additional lines need a description", variant: "destructive" });
+    }
     setSaving(true);
-    const subtotal = Number(form.package_price) || 0;
+    const packagePrice = Number(form.package_price) || 0;
+    const extrasTotal = extraLineTotal(cleanExtras);
+    const subtotal = packagePrice + extrasTotal;
     const vat_rate = Number(form.vat_rate) || 0;
     const vat_amount = subtotal * vat_rate;
     const total = subtotal + vat_amount;
+    const line_items = [
+      {
+        description: `${form.package_name}${form.service_type ? ` (${form.service_type})` : ""}`,
+        quantity: 1,
+        unit_price: packagePrice,
+        amount: packagePrice,
+      },
+      ...cleanExtras.map(li => ({
+        description: li.description,
+        quantity: Number(li.quantity) || 1,
+        unit_price: Number(li.unit_price) || 0,
+        amount: (Number(li.quantity) || 1) * (Number(li.unit_price) || 0),
+      })),
+    ];
     const payload = {
       customer_id: form.customer_id,
       invoice_number: form.invoice_number,
       service_type: form.service_type,
       package_name: form.package_name,
-      package_price: subtotal,
+      package_price: packagePrice,
       subtotal,
+      line_items,
       vat_rate,
       vat_amount,
       total,
@@ -292,6 +337,8 @@ export function ProposalInvoicesTab() {
         <Card><CardHeader className="pb-2"><CardTitle>Outstanding</CardTitle></CardHeader><CardContent><span className="text-2xl font-bold text-[hsl(var(--destructive))]">{formatGBP(totals.outstanding)}</span></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle>Paid</CardTitle></CardHeader><CardContent><span className="text-2xl font-bold text-green-600">{formatGBP(totals.paid)}</span></CardContent></Card>
       </div>
+
+      <InvoiceTotalsStrip periodLabel="Last 12 months" title="Business-wide Invoicing (CRM + Billing)" from={twelveMonthsAgoIso()} />
 
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
@@ -560,11 +607,27 @@ export function ProposalInvoicesTab() {
               <Label>Notes</Label>
               <Textarea rows={2} value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
-            <div className="col-span-2 bg-muted/40 rounded-md p-3 text-sm">
-              <div className="flex justify-between"><span>Subtotal</span><span>{formatGBP((Number(form.package_price) || 0))}</span></div>
-              <div className="flex justify-between"><span>VAT</span><span>{formatGBP(((Number(form.package_price) || 0) * (Number(form.vat_rate) || 0)))}</span></div>
-              <div className="flex justify-between font-semibold"><span>Total</span><span>{formatGBP(((Number(form.package_price) || 0) * (1 + (Number(form.vat_rate) || 0))))}</span></div>
+            <div className="col-span-2">
+              <InvoiceLineItemsEditor
+                items={form.extra_items}
+                onChange={(items) => setForm(f => ({ ...f, extra_items: items }))}
+              />
             </div>
+            {(() => {
+              const pkg = Number(form.package_price) || 0;
+              const extras = extraLineTotal(form.extra_items);
+              const sub = pkg + extras;
+              const rate = Number(form.vat_rate) || 0;
+              return (
+                <div className="col-span-2 bg-muted/40 rounded-md p-3 text-sm">
+                  <div className="flex justify-between"><span>Package</span><span>{formatGBP(pkg)}</span></div>
+                  {extras > 0 && <div className="flex justify-between"><span>Additional lines</span><span>{formatGBP(extras)}</span></div>}
+                  <div className="flex justify-between"><span>Subtotal</span><span>{formatGBP(sub)}</span></div>
+                  <div className="flex justify-between"><span>VAT</span><span>{formatGBP(sub * rate)}</span></div>
+                  <div className="flex justify-between font-semibold"><span>Total</span><span>{formatGBP(sub * (1 + rate))}</span></div>
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
