@@ -124,7 +124,9 @@ export function ChatPanel() {
     if (!isOpen || !activeRoom) return;
     clearRoomUnread(activeRoom.id);
     void markAsRead(activeRoom.id);
-  }, [isOpen, activeRoom?.id, messages.length, markAsRead, clearRoomUnread]);
+    // Deliberately not keyed on messages.length: read receipts are written once
+    // per room open/switch via the server-side RPC, not on every new message.
+  }, [isOpen, activeRoom?.id, markAsRead, clearRoomUnread]);
 
   const generalRooms = rooms.filter((r) => r.type === "general");
   const dmRooms = rooms.filter((r) => r.type === "dm");
