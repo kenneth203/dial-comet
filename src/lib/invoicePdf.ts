@@ -207,14 +207,21 @@ export async function buildInvoicePdf(inv: InvoicePdfData): Promise<Blob> {
   return doc.output("blob");
 }
 
+// The invoice-pdfs bucket is private, so public URLs 404 ("Bucket not found").
+// Issue a long-lived signed URL instead so emailed invoice links keep working.
+const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 365 * 5; // 5 years
+
 export async function uploadInvoicePdf(invoiceId: string, invoiceNumber: string, blob: Blob): Promise<string> {
   const path = `${invoiceId}/${invoiceNumber}-${Date.now()}.pdf`;
   const { error } = await supabase.storage
     .from("invoice-pdfs")
     .upload(path, blob, { contentType: "application/pdf", upsert: true });
   if (error) throw error;
-  const { data } = supabase.storage.from("invoice-pdfs").getPublicUrl(path);
-  return data.publicUrl;
+  const { data, error: signError } = await supabase.storage
+    .from("invoice-pdfs")
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, { download: `${invoiceNumber}.pdf` });
+  if (signError || !data?.signedUrl) throw signError ?? new Error("Failed to create invoice PDF link");
+  return data.signedUrl;
 }
 
 export function downloadInvoicePdfBlob(blob: Blob, filename: string) {

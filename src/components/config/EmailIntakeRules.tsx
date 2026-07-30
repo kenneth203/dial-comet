@@ -79,7 +79,7 @@ export default function EmailIntakeRules() {
       (supabase.from("email_intake_rules" as any) as any)
         .select("id, match_type, match_value, customer_id, assignee_id, task_status, task_priority, enabled, sort_order")
         .order("sort_order", { ascending: true }),
-      supabase.from("customers").select("id, name").order("name"),
+      (supabase.rpc("get_customer_directory" as any) as any),
       supabase.from("system_users").select("id, name, email").order("name"),
     ]);
     setRules(((rulesData as any) || []) as Rule[]);

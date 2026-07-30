@@ -542,11 +542,8 @@ export function useGlobalLiveAlerts() {
                 const t = task as any;
                 let customerName: string | null = null;
                 if (t?.customer_id) {
-                  const { data: cust } = await supabase
-                    .from("customers")
-                    .select("name")
-                    .eq("id", t.customer_id)
-                    .maybeSingle();
+                  const { data: directory } = await (supabase.rpc("get_customer_directory" as any) as any);
+                  const cust = ((directory ?? []) as any[]).find((c) => c.id === t.customer_id);
                   customerName = (cust as any)?.name ?? null;
                 }
                 emitMentionAlert({

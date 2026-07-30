@@ -61,7 +61,7 @@ export default function EmailRoutingAuditLog() {
         .limit(100),
       (supabase.from("email_intake_rules" as any) as any).select("id, match_type, match_value"),
       supabase.from("system_users").select("id, name, email"),
-      supabase.from("customers").select("id, name"),
+      (supabase.rpc("get_customer_directory" as any) as any),
     ]);
     setRows(((logs as any) || []) as LogRow[]);
     setRules(((rulesData as any) || []) as Rule[]);

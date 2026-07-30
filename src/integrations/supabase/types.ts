@@ -3348,6 +3348,7 @@ export type Database = {
           created_by: string | null
           customer_id: string
           day_of_month: number
+          extra_line_items: Json
           frequency: string
           id: string
           last_run_at: string | null
@@ -3372,6 +3373,7 @@ export type Database = {
           created_by?: string | null
           customer_id: string
           day_of_month?: number
+          extra_line_items?: Json
           frequency?: string
           id?: string
           last_run_at?: string | null
@@ -3396,6 +3398,7 @@ export type Database = {
           created_by?: string | null
           customer_id?: string
           day_of_month?: number
+          extra_line_items?: Json
           frequency?: string
           id?: string
           last_run_at?: string | null
@@ -4435,7 +4438,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      invoices_unified: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          customer_name: string | null
+          due_date: string | null
+          invoice_id: string | null
+          invoice_number: string | null
+          issued_date: string | null
+          period_label: string | null
+          source: string | null
+          status_normalised: string | null
+          subtotal: number | null
+          total: number | null
+          vat_amount: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_customer_secure: {
@@ -4994,6 +5014,15 @@ export type Database = {
         }[]
       }
       get_current_user_role: { Args: never; Returns: string }
+      get_customer_directory: {
+        Args: never
+        Returns: {
+          account_id: string
+          id: string
+          name: string
+          status: string
+        }[]
+      }
       get_dm_candidates: {
         Args: never
         Returns: {
@@ -5063,6 +5092,24 @@ export type Database = {
           sick_leave_entitlement: number
           sick_leave_used: number
           system_user_id: string
+        }[]
+      }
+      get_invoice_report: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          created_at: string
+          customer_id: string
+          customer_name: string
+          due_date: string
+          invoice_id: string
+          invoice_number: string
+          issued_date: string
+          period_label: string
+          source: string
+          status_normalised: string
+          subtotal: number
+          total: number
+          vat_amount: number
         }[]
       }
       get_my_basic_staff_info: {
